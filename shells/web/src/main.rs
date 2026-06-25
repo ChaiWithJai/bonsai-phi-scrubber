@@ -9,7 +9,9 @@ use airplane_core::{
     scrub, InferenceProvider, InferenceRequest, Pack, RulesExecutor, Sampling, Span,
 };
 use anyhow::{Context, Result};
+use serde::Deserialize;
 use serde_json::{json, Value};
+use std::collections::HashMap;
 use std::path::Path;
 
 const PACK_DIR: &str = "packs/coach-session";
@@ -277,10 +279,68 @@ fn handle_scrub(body: &str) -> Result<Value> {
 // ---- the Slack sink (real post via incoming webhook) -------------------------
 // The DE-IDENTIFIED record is what leaves — the clean thing, never the identifiers.
 
-fn slack_post(record: &Value) -> Result<()> {
-    let webhook = std::env::var("SLACK_WEBHOOK_URL").map_err(|_| {
-        anyhow::anyhow!("SLACK_WEBHOOK_URL not set — export it and restart ./run.sh web")
-    })?;
+#[derive(Debug, Deserialize)]
+struct SinkConfig {
+    #[serde(rename = "channelMap", default)]
+    channel_map: HashMap<String, String>,
+    #[serde(default)]
+    credentials: SinkCredentials,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SinkCredentials {
+    #[serde(default)]
+    ref_name: String,
+    #[serde(rename = "ref", default)]
+    ref_alias: String,
+}
+
+impl SinkCredentials {
+    fn keychain_ref(&self) -> &str {
+        if self.ref_alias.is_empty() {
+            &self.ref_name
+        } else {
+            &self.ref_alias
+        }
+    }
+}
+
+fn load_sink_config() -> Result<SinkConfig> {
+    let text = std::fs::read_to_string(Path::new(PACK_DIR).join("sink.yaml")).context("read sink.yaml")?;
+    serde_yaml::from_str(&text).context("parse sink.yaml")
+}
+
+fn slack_channel(config: &SinkConfig) -> String {
+    std::env::var("SLACK_CHANNEL")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .or_else(|| config.channel_map.get("default").cloned())
+        .unwrap_or_else(|| "#coach-records".to_string())
+}
+
+fn keychain_secret(service: &str) -> Option<String> {
+    if service.trim().is_empty() {
+        return None;
+    }
+    let output = std::process::Command::new("security")
+        .args(["find-generic-password", "-s", service, "-w"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let secret = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    (!secret.is_empty()).then_some(secret)
+}
+
+fn slack_bot_token(config: &SinkConfig) -> Option<String> {
+    std::env::var("SLACK_BOT_TOKEN")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .or_else(|| keychain_secret(config.credentials.keychain_ref()))
+}
+
+fn slack_blocks(record: &Value) -> Value {
     let pseud = record["client_pseudonym"].as_str().unwrap_or("CLIENT");
     let themes = record["themes"]
         .as_array()
@@ -313,24 +373,57 @@ fn slack_post(record: &Value) -> Result<()> {
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| "none".into());
     let next = record["next_touch"].as_str().unwrap_or("—");
+    json!([
+        {"type":"header","text":{"type":"plain_text","text":"Coach session record"}},
+        {"type":"section","fields":[
+            {"type":"mrkdwn","text":format!("*Client*\n{pseud}")},
+            {"type":"mrkdwn","text":format!("*Next touch*\n{next}")},
+            {"type":"mrkdwn","text":format!("*Themes*\n{themes}")},
+            {"type":"mrkdwn","text":format!("*Commitment*\n{commit} · open")},
+            {"type":"mrkdwn","text":format!("*Follow-up*\n{follow}")},
+            {"type":"mrkdwn","text":format!("*Risk flags*\n{risk}")},
+        ]},
+        {"type":"context","elements":[{"type":"mrkdwn",
+            "text":"✓ de-identified · gate-clean · autonomy signals only · no name, no member ID"}]}
+    ])
+}
+
+fn slack_post(record: &Value) -> Result<()> {
+    let config = load_sink_config()?;
+    let blocks = slack_blocks(record);
+    if let Some(webhook) = std::env::var("SLACK_WEBHOOK_URL")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+    {
+        let payload = json!({ "blocks": blocks });
+        ureq::post(&webhook)
+            .send_json(payload)
+            .map_err(|e| anyhow::anyhow!("Slack webhook post failed: {e}"))?;
+        return Ok(());
+    }
+
+    let token = slack_bot_token(&config).ok_or_else(|| {
+        anyhow::anyhow!(
+            "Slack sink not configured — set SLACK_WEBHOOK_URL, or SLACK_BOT_TOKEN plus SLACK_CHANNEL / sink.yaml channelMap"
+        )
+    })?;
+    let channel = slack_channel(&config);
     let payload = json!({
-        "blocks": [
-            {"type":"header","text":{"type":"plain_text","text":"Coach session record"}},
-            {"type":"section","fields":[
-                {"type":"mrkdwn","text":format!("*Client*\n{pseud}")},
-                {"type":"mrkdwn","text":format!("*Next touch*\n{next}")},
-                {"type":"mrkdwn","text":format!("*Themes*\n{themes}")},
-                {"type":"mrkdwn","text":format!("*Commitment*\n{commit} · open")},
-                {"type":"mrkdwn","text":format!("*Follow-up*\n{follow}")},
-                {"type":"mrkdwn","text":format!("*Risk flags*\n{risk}")},
-            ]},
-            {"type":"context","elements":[{"type":"mrkdwn",
-                "text":"✓ de-identified · gate-clean · autonomy signals only · no name, no member ID"}]}
-        ]
+        "channel": channel,
+        "blocks": blocks
     });
-    ureq::post(&webhook)
+    let resp = ureq::post("https://slack.com/api/chat.postMessage")
+        .set("Authorization", &format!("Bearer {token}"))
+        .set("Content-Type", "application/json; charset=utf-8")
         .send_json(payload)
-        .map_err(|e| anyhow::anyhow!("Slack post failed: {e}"))?;
+        .map_err(|e| anyhow::anyhow!("Slack bot post failed: {e}"))?;
+    let body: Value = resp.into_json().context("parse Slack response")?;
+    if body["ok"].as_bool() != Some(true) {
+        anyhow::bail!(
+            "Slack bot post failed: {}",
+            body["error"].as_str().unwrap_or("unknown_error")
+        );
+    }
     Ok(())
 }
 
@@ -428,7 +521,13 @@ fn main() -> Result<()> {
     println!("  needs the model:  ./scripts/serve-model.sh");
     match std::env::var("SLACK_WEBHOOK_URL") {
         Ok(_) => println!("  slack:   SLACK_WEBHOOK_URL set — records post for real"),
-        Err(_) => println!("  slack:   NOT set — export SLACK_WEBHOOK_URL to post for real (preview only otherwise)"),
+        Err(_) if std::env::var("SLACK_BOT_TOKEN").is_ok() => {
+            let route = load_sink_config()
+                .map(|c| slack_channel(&c))
+                .unwrap_or_else(|_| "#coach-records".to_string());
+            println!("  slack:   SLACK_BOT_TOKEN set — records post to {route}")
+        }
+        Err(_) => println!("  slack:   NOT set — export SLACK_WEBHOOK_URL or SLACK_BOT_TOKEN to post for real"),
     }
 
     for mut req in server.incoming_requests() {
@@ -534,5 +633,22 @@ mod tests {
             out["autonomy_delta"]["signals"][0],
             "surface_human_escalation"
         );
+    }
+
+    #[test]
+    fn sink_config_routes_default_channel() {
+        let sink: SinkConfig = serde_yaml::from_str(
+            r##"
+kind: slack
+channelMap:
+  default: "#coach-records"
+credentials:
+  source: keychain
+  ref: slack-bot-token
+"##,
+        )
+        .unwrap();
+        assert_eq!(slack_channel(&sink), "#coach-records");
+        assert_eq!(sink.credentials.keychain_ref(), "slack-bot-token");
     }
 }

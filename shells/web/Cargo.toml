@@ -13,6 +13,7 @@ path = "src/main.rs"
 airplane-core = { path = "../../crates/airplane-core" }
 serde = { workspace = true }
 serde_json = { workspace = true }
+serde_yaml = { workspace = true }
 anyhow = { workspace = true }
 ureq = { version = "2", features = ["json"] }
 tiny_http = "0.12"
