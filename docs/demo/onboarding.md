@@ -85,6 +85,21 @@ The fix is to put both devices on the iPhone's own local network:
 7. With the in-app airplane toggle **ON**, the send is **HELD** ("refuses to send").
 8. Flip the **in-app airplane toggle OFF** → the queue flushes → **"Posted"** → tap **"View in #coach-records"** to see the de-identified Slack card.
 
+## Wire Slack — the real post (the payoff)
+
+By default the record shows as a **preview**. To make it actually land in a Slack channel — so your audience can open Slack and evaluate the clean record — set up an **incoming webhook** (2 minutes, no OAuth):
+
+1. Go to **https://api.slack.com/apps** → **Create New App** → **From scratch** → name it "Airplane Mode", pick your workspace.
+2. **Incoming Webhooks** → toggle **On** → **Add New Webhook to Workspace** → choose the channel (e.g. `#coach-records`) → **Allow** → copy the URL (`https://hooks.slack.com/services/...`).
+3. Restart the web server with the URL in the environment:
+   ```bash
+   SLACK_WEBHOOK_URL='https://hooks.slack.com/services/XXX/YYY/ZZZ' ./run.sh web
+   ```
+   On startup it prints `slack: SLACK_WEBHOOK_URL set — records post for real`.
+4. Run the demo. When the queue flushes, the **de-identified record posts to that Slack channel for real** — no name, no member ID. Open Slack on the big screen and evaluate it.
+
+The webhook is a secret — it's read from the environment and never committed. Without it the demo still runs (the delivered screen shows "Held · set SLACK_WEBHOOK_URL").
+
 ## Warnings
 
 - **Do NOT put the phone in REAL airplane mode.** That drops Wi-Fi/hotspot and the phone can't reach the Mac. The **"Airplane mode" toggle IN THE APP** is the demo control — that's the one you flip.

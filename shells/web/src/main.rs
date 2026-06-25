@@ -145,6 +145,45 @@ fn handle_scrub(body: &str) -> Result<Value> {
     }))
 }
 
+// ---- the Slack sink (real post via incoming webhook) -------------------------
+// The DE-IDENTIFIED record is what leaves — the clean thing, never the identifiers.
+
+fn slack_post(record: &Value) -> Result<()> {
+    let webhook = std::env::var("SLACK_WEBHOOK_URL")
+        .map_err(|_| anyhow::anyhow!("SLACK_WEBHOOK_URL not set — export it and restart ./run.sh web"))?;
+    let pseud = record["client_pseudonym"].as_str().unwrap_or("CLIENT");
+    let themes = record["themes"].as_array()
+        .map(|a| a.iter().filter_map(|t| t.as_str()).collect::<Vec<_>>().join(" · "))
+        .filter(|s| !s.is_empty()).unwrap_or_else(|| "—".into());
+    let commit = record["commitments"].as_array().and_then(|a| a.first())
+        .and_then(|c| c["text"].as_str()).unwrap_or("—");
+    let next = record["next_touch"].as_str().unwrap_or("—");
+    let payload = json!({
+        "blocks": [
+            {"type":"header","text":{"type":"plain_text","text":"Coach session record"}},
+            {"type":"section","fields":[
+                {"type":"mrkdwn","text":format!("*Client*\n{pseud}")},
+                {"type":"mrkdwn","text":format!("*Next touch*\n{next}")},
+                {"type":"mrkdwn","text":format!("*Themes*\n{themes}")},
+                {"type":"mrkdwn","text":format!("*Commitment*\n{commit} · open")},
+            ]},
+            {"type":"context","elements":[{"type":"mrkdwn",
+                "text":"✓ de-identified · gate-clean · posted from the edge — no name, no member ID"}]}
+        ]
+    });
+    ureq::post(&webhook).send_json(payload)
+        .map_err(|e| anyhow::anyhow!("Slack post failed: {e}"))?;
+    Ok(())
+}
+
+fn handle_send(body: &str) -> Value {
+    let input: Value = serde_json::from_str(body).unwrap_or_else(|_| json!({}));
+    match slack_post(&input["record"]) {
+        Ok(()) => json!({"ok": true}),
+        Err(e) => json!({"ok": false, "error": format!("{e}")}),
+    }
+}
+
 fn local_ips() -> Vec<String> {
     // best-effort: ask the OS for a route-local address
     std::process::Command::new("sh")
@@ -164,6 +203,10 @@ fn main() -> Result<()> {
         println!("  phone:   http://{ip}:8088   (same Wi-Fi / hotspot)");
     }
     println!("  needs the model:  ~/projects/bonsai/scripts/serve.sh");
+    match std::env::var("SLACK_WEBHOOK_URL") {
+        Ok(_) => println!("  slack:   SLACK_WEBHOOK_URL set — records post for real"),
+        Err(_) => println!("  slack:   NOT set — export SLACK_WEBHOOK_URL to post for real (preview only otherwise)"),
+    }
 
     for mut req in server.incoming_requests() {
         let url = req.url().to_string();
@@ -187,6 +230,12 @@ fn main() -> Result<()> {
                     Err(e) => (500, json!({"error": format!("{e:#}")}).to_string()),
                 };
                 let _ = req.respond(tiny_http::Response::from_string(payload).with_status_code(status).with_header(json_header));
+            }
+            ("POST", "/api/send") => {
+                let mut body = String::new();
+                let _ = req.as_reader().read_to_string(&mut body);
+                let payload = handle_send(&body).to_string();
+                let _ = req.respond(tiny_http::Response::from_string(payload).with_header(json_header));
             }
             _ => {
                 let _ = req.respond(tiny_http::Response::from_string("not found").with_status_code(404));

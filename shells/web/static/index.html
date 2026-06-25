@@ -43,10 +43,7 @@
   #phone.dark{background:radial-gradient(120% 80% at 50% 0%,#1a1712,#0e0c0a)}
   #phone.dark.green{background:radial-gradient(120% 75% at 50% 100%,#12231a,#0a0d0b)}
 
-  .statusbar{flex:none;height:46px;display:flex;align-items:center;justify-content:space-between;
-    padding:14px 26px 0;font:600 13px/1 var(--mono)}
-  .screen{flex:1;display:flex;flex-direction:column;padding:8px 24px 26px;overflow:hidden;animation:pop .35s ease}
-  .signal i{width:3px;background:currentColor;border-radius:1px;display:block}
+  .screen{flex:1;min-height:0;display:flex;flex-direction:column;padding:20px 24px 24px;overflow:hidden;animation:pop .35s ease}
 
   h1{font:800 40px/.97 var(--sans);letter-spacing:-.03em;margin:0}
   .kicker{font:500 12px/1 var(--mono);letter-spacing:.07em;color:#a39a86}
@@ -61,14 +58,14 @@
     box-shadow:0 1px 2px rgba(0,0,0,.25);transition:left .25s,right .25s}
   .sw.on{background:var(--gold)} .sw.on b{right:3px} .sw.off{background:#2f6f4c} .sw.off b{left:3px}
   .note{background:var(--card);border:1.5px solid #ece4d4;border-radius:16px;padding:16px;
-    font:400 14.5px/1.65 var(--sans);color:#3a352c;flex:1;overflow:auto;width:100%;resize:none;outline:none}
+    font:400 14.5px/1.65 var(--sans);color:#3a352c;flex:1;min-height:0;overflow:auto;width:100%;resize:none;outline:none}
   .chip{font:600 11px var(--sans);color:#3a352c;background:#efe9da;border-radius:8px;padding:5px 9px;display:inline-block}
   .pill{font:600 9px/1 var(--mono);border-radius:20px;padding:4px 8px;display:inline-flex;align-items:center;gap:4px}
   .mono{font-family:var(--mono)}
-  .grow{flex:1}
+  .grow{flex:1;min-height:0}
   .center{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
   /* dark proof-beat bits */
-  .dbox{background:rgba(255,255,255,.02);border:1px solid #2a2620;border-radius:16px}
+  .dbox{background:rgba(255,255,255,.02);border:1px solid #2a2620;border-radius:16px;min-height:0}
   .swband{position:absolute;left:0;right:0;height:34px;border-bottom:1.5px solid rgba(54,194,129,.65);
     background:linear-gradient(180deg,rgba(54,194,129,0),rgba(54,194,129,.16) 60%,rgba(54,194,129,.42));
     animation:sweep 2.4s cubic-bezier(.5,0,.5,1) infinite;z-index:2}
@@ -82,7 +79,6 @@
 <body>
 <div id="phone">
   <div id="notch"></div>
-  <div id="status" class="statusbar"></div>
   <div id="screen" class="screen"></div>
 </div>
 
@@ -90,28 +86,14 @@
 
 <script>
 const NOTE = "Met with Maria Alvarez (CM-204815) at her place Tuesday. She's the one whose daughter just started college. Committed to a 10-min morning walk daily.";
-const S = { airplane:true, screen:'capturing', note:'', result:null, error:null };
+const S = { airplane:true, screen:'capturing', note:'', result:null, error:null, posted:false, sendNote:'' };
 
 const $phone = document.getElementById('phone');
-const $status = document.getElementById('status');
 const $screen = document.getElementById('screen');
 const $slack = document.getElementById('slack');
 const $scard = document.getElementById('scard');
 
-const signal = (col)=>`<span class="signal" style="display:flex;gap:2px;align-items:flex-end;color:${col}">
-  <i style="height:5px"></i><i style="height:7px"></i><i style="height:9px"></i><i style="height:11px"></i></span>`;
-
-function statusbar(){
-  const dark = $phone.classList.contains('dark');
-  const ink = dark ? '#efe9dc' : '#221f19';
-  let right;
-  if (S.airplane) right = `<span style="color:${dark?'#d09a3a':'#b87814'};font-size:14px">✈</span>`;
-  else right = `<span style="display:flex;align-items:center;gap:6px;color:${ink}">${signal(ink)}<span style="font:600 11px var(--mono)">LTE</span></span>`;
-  $status.style.color = ink;
-  $status.innerHTML = `<span>${clock(false)}</span>${right}`;
-}
-
-// real device clock (this runs in the phone's browser)
+// real time for the Slack message preview (this runs in the phone's browser)
 function clock(ampm){
   const d=new Date(); let h=d.getHours(); const m=String(d.getMinutes()).padStart(2,'0');
   const ap=h<12?'AM':'PM'; h=h%12||12;
@@ -208,7 +190,7 @@ const screens = {
    <div style="display:flex;align-items:center;justify-content:space-between">
      <div style="font:700 17px var(--sans);letter-spacing:-.01em">Care record</div>
      <span class="pill" style="color:var(--green);background:#e6f0e7;border:1px solid #bfdcc6">✓ CLEAN</span></div>
-   <div style="flex:1;margin-top:14px;background:var(--card);border:1.5px solid var(--line);border-radius:18px;padding:16px;overflow:auto">
+   <div style="flex:1;min-height:0;margin-top:14px;background:var(--card);border:1.5px solid var(--line);border-radius:18px;padding:16px;overflow:auto">
      <div class="mono" style="font-size:10px;color:#a39a86;letter-spacing:.05em">CLIENT_PSEUDONYM</div>
      <div class="mono" style="font:700 19px var(--mono);margin-top:6px">${esc(rec.client_pseudonym||'CLIENT-—')}</div>
      ${themes.length ? `<div style="height:1px;background:var(--line);margin:14px 0"></div>
@@ -248,9 +230,7 @@ const screens = {
      <div style="font:600 16px/1.35 var(--sans);letter-spacing:-.01em">It refuses to send.<br><span style="color:var(--amber)">Good — that's the proof.</span></div></div>
    ${toggleHTML('Airplane mode — turn off to send', false)}`; },
 
- flush(){ setDark(true,true);
-   setTimeout(()=>go('delivered'), 2600);
-   return `
+ flush(){ setDark(true,true); return `
    <div style="font:700 18px var(--sans);color:#eef4ee;letter-spacing:-.01em">Connectivity restored</div>
    ${ '' }
    <div style="display:flex;align-items:center;justify-content:space-between;border:1px solid #243029;background:rgba(255,255,255,.02);border-radius:14px;padding:12px 14px;margin-top:15px">
@@ -271,9 +251,9 @@ const screens = {
    const r=S.result; const rec=r.record;
    return `
    <div class="grow center" style="gap:18px">
-     <div style="width:62px;height:62px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;color:#fff;font-size:30px;box-shadow:0 14px 30px -10px rgba(31,122,77,.6)">✓</div>
-     <div><h1 style="font-size:30px">Posted</h1>
-       <div class="sub" style="margin-top:8px">Clean record landed in<br><span class="mono" style="font-weight:700;color:var(--ink)">#coach-records</span></div></div></div>
+     <div style="width:62px;height:62px;border-radius:50%;background:${S.posted?'var(--green)':'#e3c98a'};display:flex;align-items:center;justify-content:center;color:#fff;font-size:30px;box-shadow:0 14px 30px -10px rgba(31,122,77,.4)">${S.posted?'✓':'✈'}</div>
+     <div><h1 style="font-size:30px">${S.posted?'Posted':'Held'}</h1>
+       <div class="sub" style="margin-top:8px">${S.posted?'Clean record landed in<br><span class="mono" style="font-weight:700;color:var(--ink)">#coach-records</span>':esc(S.sendNote||'Set SLACK_WEBHOOK_URL to post for real')}</div></div></div>
    <div style="background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:9px" class="mono">
      <div style="display:flex;justify-content:space-between;font-size:12px;color:#736c5d"><span>record</span><span style="color:var(--ink)">${esc(rec.client_pseudonym||'CLIENT')}</span></div>
      <div style="display:flex;justify-content:space-between;font-size:12px;color:#736c5d"><span>identifiers sent</span><span style="color:var(--green);font-weight:700">0</span></div>
@@ -289,13 +269,12 @@ function go(name){ S.screen=name; render(); }
 
 function render(){
   $screen.innerHTML = screens[S.screen]();
-  statusbar();
   $screen.querySelectorAll('[data-act]').forEach(el=>el.addEventListener('click',onAct));
 }
 
 async function onAct(e){
   const act = e.currentTarget.getAttribute('data-act');
-  if(act==='toggle'){ S.airplane=!S.airplane; if(S.screen==='held' && !S.airplane){ return go('flush'); } return render(); }
+  if(act==='toggle'){ S.airplane=!S.airplane; if(S.screen==='held' && !S.airplane){ go('flush'); return doSend(); } return render(); }
   if(act==='sample'){ S.note=NOTE; return render(); }
   if(act==='scrub'){
     if(!S.note.trim()){ alert('Dictate or type a note first — or tap “Use a sample note”.'); return; }
@@ -319,6 +298,16 @@ async function doScrub(){
     S.result = data;
   }catch(err){ S.error = (err && err.message) || 'could not reach the scrubber'; }
   if(S.screen==='scrubbing') render();
+}
+
+async function doSend(){
+  S.posted=false; S.sendNote='';
+  // real Slack post, with a minimum dwell so the flush animation reads
+  const post = fetch('/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({record:S.result.record})})
+    .then(r=>r.json()).catch(()=>({ok:false,error:'could not reach the sink'}));
+  const [data] = await Promise.all([post, new Promise(r=>setTimeout(r,1900))]);
+  S.posted = !!data.ok; S.sendNote = data.ok ? '' : (data.error||'');
+  go('delivered');
 }
 
 function showSlack(){
@@ -346,13 +335,13 @@ function showSlack(){
              <span class="mono" style="font-size:11px;color:#a39a86">NEXT TOUCH</span><span class="mono">${esc(rec.next_touch||'—')}</span>
            </div>
            <div class="mono" style="display:flex;align-items:center;gap:8px;margin-top:15px;border-top:1px solid #f0eadd;padding-top:11px;font-size:10px;color:#8aa692">
-             <span style="color:var(--green)">✓</span> de-identified · gate-clean · ready to post</div>
+             <span style="color:var(--green)">✓</span> de-identified · gate-clean · ${S.posted?'posted from the edge':'ready to post'}</div>
          </div>
          <div style="margin-top:14px;display:flex;align-items:center;gap:9px;flex-wrap:wrap">
            <span style="font:700 13px var(--sans);color:var(--red)">↑ No name. No member ID.</span>
            <span style="font:500 12px var(--sans);color:#9a7a6e">Not redacted out — never structured in.</span></div>
        </div></div>
-     <div class="mono" style="font-size:10px;color:#a39a86;text-align:center;margin-top:16px">preview · live Slack delivery lands in M2</div>
+     <div class="mono" style="font-size:10px;color:#a39a86;text-align:center;margin-top:16px">${S.posted?'✓ posted to #coach-records — open Slack to evaluate':'preview · set SLACK_WEBHOOK_URL to post for real'}</div>
      <button class="btn" data-act="close" onclick="document.getElementById('slack').style.display='none'" style="margin-top:12px;background:var(--ink)">Close</button>
    </div>`;
   $slack.style.display='flex';
@@ -360,7 +349,6 @@ function showSlack(){
 $slack.addEventListener('click',e=>{ if(e.target===$slack) $slack.style.display='none'; });
 
 render();
-setInterval(statusbar, 20000);   // keep the clock live
 </script>
 </body>
 </html>
