@@ -1,0 +1,10 @@
+{
+  "id": "note-08",
+  "clean": false,
+  "redactions": [
+    {"text": "Rosa", "entity": "PERSON", "hard": true, "why": "first name in prose"},
+    {"text": "the last day of school before summer", "entity": "DATE", "hard": true, "why": "date in words"},
+    {"text": "Hawthorne Street", "entity": "ADDRESS", "hard": true, "why": "street named in prose"},
+    {"text": "Daniel", "entity": "PERSON", "hard": true, "why": "ex-husband's name in prose"}
+  ]
+}

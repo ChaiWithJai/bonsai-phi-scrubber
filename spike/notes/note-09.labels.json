@@ -1,0 +1,11 @@
+{
+  "id": "note-09",
+  "clean": false,
+  "redactions": [
+    {"text": "CM-771206", "entity": "MEMBER_ID", "hard": false, "why": "structured id"},
+    {"text": "Kit", "entity": "PERSON", "hard": true, "why": "nickname in prose"},
+    {"text": "Northstar Credit Union", "entity": "ORG", "hard": true, "why": "employer named in prose"},
+    {"text": "Cleveland", "entity": "LOCATION", "hard": true, "why": "location in prose"},
+    {"text": "kit.delgado@gmail.com", "entity": "EMAIL", "hard": false, "why": "structured email"}
+  ]
+}

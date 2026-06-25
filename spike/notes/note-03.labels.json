@@ -1,0 +1,10 @@
+{
+  "id": "note-03",
+  "clean": false,
+  "redactions": [
+    {"text": "Priya", "entity": "PERSON", "hard": true, "why": "first name in prose"},
+    {"text": "this past Thanksgiving", "entity": "DATE", "hard": true, "why": "date in words"},
+    {"text": "Maple Crest Avenue", "entity": "ADDRESS", "hard": true, "why": "street named in prose"},
+    {"text": "Sundial Marketing", "entity": "ORG", "hard": true, "why": "employer named in prose"}
+  ]
+}

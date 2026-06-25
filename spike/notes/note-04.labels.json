@@ -1,0 +1,12 @@
+{
+  "id": "note-04",
+  "clean": false,
+  "redactions": [
+    {"text": "CM-318472", "entity": "MEMBER_ID", "hard": false, "why": "structured id"},
+    {"text": "Jamal", "entity": "PERSON", "hard": true, "why": "first name in prose"},
+    {"text": "Theo", "entity": "PERSON", "hard": true, "why": "brother's name in prose"},
+    {"text": "Lena", "entity": "PERSON", "hard": true, "why": "sister's name in prose"},
+    {"text": "his sister Lena, who lives in Tacoma", "entity": "FAMILY_DETAIL", "hard": true, "why": "relationship plus location identifies"},
+    {"text": "Tacoma", "entity": "LOCATION", "hard": true, "why": "location in prose"}
+  ]
+}

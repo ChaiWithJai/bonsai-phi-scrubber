@@ -1,0 +1,11 @@
+{
+  "id": "note-01",
+  "clean": false,
+  "redactions": [
+    {"text": "Maria Alvarez", "entity": "PERSON", "hard": true, "why": "name embedded in prose"},
+    {"text": "Brightwater Logistics", "entity": "ORG", "hard": true, "why": "employer named in prose"},
+    {"text": "Marcus", "entity": "PERSON", "hard": true, "why": "name buried in prose, regex would miss"},
+    {"text": "CM-204815", "entity": "MEMBER_ID", "hard": false, "why": "structured id"},
+    {"text": "the second Tuesday of next month", "entity": "DATE", "hard": true, "why": "date in words"}
+  ]
+}

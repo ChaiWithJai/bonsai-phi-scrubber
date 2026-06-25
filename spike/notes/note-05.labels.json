@@ -1,0 +1,10 @@
+{
+  "id": "note-05",
+  "clean": false,
+  "redactions": [
+    {"text": "Eleanor", "entity": "PERSON", "hard": true, "why": "first name in prose"},
+    {"text": "Riverside Day School", "entity": "ORG", "hard": true, "why": "employer named in prose"},
+    {"text": "e.whitfield@protonmail.com", "entity": "EMAIL", "hard": false, "why": "structured email"},
+    {"text": "Gerald", "entity": "PERSON", "hard": true, "why": "husband's name in prose"}
+  ]
+}

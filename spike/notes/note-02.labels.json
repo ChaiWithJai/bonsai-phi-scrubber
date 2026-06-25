@@ -1,0 +1,11 @@
+{
+  "id": "note-02",
+  "clean": false,
+  "redactions": [
+    {"text": "Devon", "entity": "PERSON", "hard": true, "why": "first name in prose"},
+    {"text": "Cedar Mountain Hospital", "entity": "ORG", "hard": true, "why": "employer named in prose"},
+    {"text": "his daughter who just started at Northwestern", "entity": "FAMILY_DETAIL", "hard": true, "why": "disclosed relationship that identifies"},
+    {"text": "devon.k.harper@fastmail.com", "entity": "EMAIL", "hard": false, "why": "structured email"},
+    {"text": "503-555-0182", "entity": "PHONE", "hard": false, "why": "structured phone number"}
+  ]
+}

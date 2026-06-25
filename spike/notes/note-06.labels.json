@@ -1,0 +1,10 @@
+{
+  "id": "note-06",
+  "clean": false,
+  "redactions": [
+    {"text": "Aisha", "entity": "PERSON", "hard": true, "why": "first name in prose"},
+    {"text": "the week before her birthday", "entity": "DATE", "hard": true, "why": "date in words"},
+    {"text": "Halcyon Tech", "entity": "ORG", "hard": true, "why": "employer named in prose"},
+    {"text": "CM-559013", "entity": "MEMBER_ID", "hard": false, "why": "structured id"}
+  ]
+}

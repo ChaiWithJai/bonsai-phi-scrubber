@@ -1,0 +1,11 @@
+{
+  "id": "note-07",
+  "clean": false,
+  "redactions": [
+    {"text": "Tomas", "entity": "PERSON", "hard": true, "why": "first name in prose"},
+    {"text": "Mateo", "entity": "PERSON", "hard": true, "why": "son's name in prose"},
+    {"text": "his son Mateo started kindergarten this fall", "entity": "FAMILY_DETAIL", "hard": true, "why": "relationship detail that identifies"},
+    {"text": "the corner of 4th and Birch in Glenndale", "entity": "ADDRESS", "hard": true, "why": "specific location in prose"},
+    {"text": "(415) 555-0143", "entity": "PHONE", "hard": false, "why": "structured phone number"}
+  ]
+}

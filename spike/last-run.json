@@ -1,0 +1,43 @@
+{
+  "mode": "determinism",
+  "note_id": "note-03",
+  "runs": 5,
+  "verdict": "VARIES",
+  "signatures": [
+    [
+      "priya reported a much calmer week after the boundary-setting work we did.|Priya",
+      "she felt proud, and so did i.|Priya",
+      "she lives just off maple crest avenue and mentioned the neighborhood walks have helped her sleep.|Priya",
+      "the big breakthrough came this past thanksgiving, when she chose not to host her in-laws for the first time in a decade.|Priya",
+      "we reviewed her progress toward leaving her role at sundial marketing.|Sundial Marketing"
+    ],
+    [
+      "priya reported a much calmer week after the boundary-setting work we did.|Person",
+      "she felt proud, and so did i.|Person",
+      "she lives just off maple crest avenue and mentioned the neighborhood walks have helped her sleep.|Location",
+      "the big breakthrough came this past thanksgiving, when she chose not to host her in-laws for the first time in a decade.|Person",
+      "we reviewed her progress toward leaving her role at sundial marketing.|Organization"
+    ],
+    [
+      "priya reported a much calmer week after the boundary-setting work we did.|Priya",
+      "she felt proud, and so did i.|I",
+      "she lives just off maple crest avenue and mentioned the neighborhood walks have helped her sleep.|Priya",
+      "the big breakthrough came this past thanksgiving, when she chose not to host her in-laws for the first time in a decade.|Priya",
+      "we reviewed her progress toward leaving her role at sundial marketing.|Sundial Marketing"
+    ],
+    [
+      "priya reported a much calmer week after the boundary-setting work we did.|name",
+      "she felt proud, and so did i.|name",
+      "she lives just off maple crest avenue and mentioned the neighborhood walks have helped her sleep.|name",
+      "the big breakthrough came this past thanksgiving, when she chose not to host her in-laws for the first time in a decade.|name",
+      "we reviewed her progress toward leaving her role at sundial marketing.|name"
+    ],
+    [
+      "priya reported a much calmer week after the boundary-setting work we did.|Priya",
+      "she felt proud, and so did i.|I",
+      "she lives just off maple crest avenue and mentioned the neighborhood walks have helped her sleep.|Priya",
+      "the big breakthrough came this past thanksgiving, when she chose not to host her in-laws for the first time in a decade.|Priya",
+      "we reviewed her progress toward leaving her role at sundial marketing.|Sundial Marketing"
+    ]
+  ]
+}
