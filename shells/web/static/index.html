@@ -94,7 +94,7 @@
 
 <script>
 const NOTE = "Met with Maria Alvarez (CM-204815) at her place Tuesday. She's the one whose daughter just started college. Committed to a 10-min morning walk daily.";
-const S = { airplane:true, screen:'capturing', note:'', result:null, error:null, posted:false, sendNote:'', packDemo:null, packError:null, listening:false, speechMsg:'' };
+const S = { airplane:true, screen:'capturing', note:'', result:null, error:null, posted:false, sendNote:'', trajectoryCount:0, trajectoryNote:'', packDemo:null, packError:null, listening:false, speechMsg:'' };
 let recognizer = null;
 
 const $phone = document.getElementById('phone');
@@ -281,7 +281,9 @@ const screens = {
    <div style="background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:9px" class="mono">
      <div style="display:flex;justify-content:space-between;font-size:12px;color:#736c5d"><span>record</span><span style="color:var(--ink)">${esc(rec.client_pseudonym||'CLIENT')}</span></div>
      <div style="display:flex;justify-content:space-between;font-size:12px;color:#736c5d"><span>identifiers sent</span><span style="color:var(--green);font-weight:700">0</span></div>
+     <div style="display:flex;justify-content:space-between;font-size:12px;color:#736c5d"><span>trajectory env</span><span style="color:${S.trajectoryCount?'var(--green)':'var(--amber)'};font-weight:700">${S.trajectoryCount||'—'}</span></div>
      <div style="display:flex;justify-content:space-between;font-size:12px;color:#736c5d"><span>raw note left the edge</span><span style="color:var(--green);font-weight:700">never</span></div></div>
+   <div class="mono" style="font-size:10px;color:#8a8273;margin-top:9px">${esc(S.trajectoryNote||'gate-clean trajectories only')}</div>
    <div style="font:600 15px/1.4 var(--sans);margin-top:14px;letter-spacing:-.01em">The real name never reached the cloud. Only this did.</div>
    <div style="display:flex;gap:9px;margin-top:12px">
      <button class="btn" data-act="slack" style="background:#3a1f3a;padding:14px">View Slack</button>
@@ -411,12 +413,16 @@ async function doScrub(){
 }
 
 async function doSend(){
-  S.posted=false; S.sendNote='';
+  S.posted=false; S.sendNote=''; S.trajectoryNote='';
   // real Slack post, with a minimum dwell so the flush animation reads
   const post = fetch('/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({record:S.result.record})})
     .then(r=>r.json()).catch(()=>({ok:false,error:'could not reach the sink'}));
-  const [data] = await Promise.all([post, new Promise(r=>setTimeout(r,1900))]);
+  const trajectory = fetch('/api/trajectory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({record:S.result.record})})
+    .then(r=>r.json()).catch(()=>({ok:false,error:'trajectory store unavailable'}));
+  const [data,traj] = await Promise.all([post, trajectory, new Promise(r=>setTimeout(r,1900))]);
   S.posted = !!data.ok; S.sendNote = data.ok ? '' : (data.error||'');
+  if(traj.ok){ S.trajectoryCount = traj.count; S.trajectoryNote = 'trajectory stored · gate-clean'; }
+  else { S.trajectoryNote = traj.error || 'trajectory not stored'; }
   go('delivered');
 }
 

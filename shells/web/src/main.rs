@@ -6,18 +6,36 @@
 //! same LAN can drive the demo against this laptop.
 
 use airplane_core::{
-    scrub, InferenceProvider, InferenceRequest, Pack, RulesExecutor, Sampling, Span,
+    scrub, GateDecision, InferenceProvider, InferenceRequest, Pack, RulesExecutor, Sampling, Span,
+    VerifierGate,
 };
 use anyhow::{Context, Result};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 const PACK_DIR: &str = "packs/coach-session";
 const INDEX: &str = "shells/web/static/index.html";
 const DEFAULT_ADDR: &str = "0.0.0.0:8088";
 const PASSES: u32 = 5;
+static TRAJECTORY_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+fn repo_path(rel: &str) -> PathBuf {
+    let direct = PathBuf::from(rel);
+    if direct.exists() {
+        direct
+    } else {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join(rel)
+    }
+}
+
+fn pack_path() -> PathBuf {
+    repo_path(PACK_DIR)
+}
 
 // ---- llama-server adapter (InferenceProvider port, web side) -----------------
 
@@ -240,7 +258,7 @@ fn handle_scrub(body: &str) -> Result<Value> {
     let input: Value = serde_json::from_str(body).context("parse request body")?;
     let text = input["text"].as_str().unwrap_or("").to_string();
 
-    let pack = Pack::load(Path::new(PACK_DIR)).context("load coach-session pack")?;
+    let pack = Pack::load(&pack_path()).context("load coach-session pack")?;
     let model = LlamaServer::default();
     let res = scrub(&text, &pack.rules, Some(&model), Sampling::eval(), PASSES)?;
 
@@ -306,7 +324,7 @@ impl SinkCredentials {
 }
 
 fn load_sink_config() -> Result<SinkConfig> {
-    let text = std::fs::read_to_string(Path::new(PACK_DIR).join("sink.yaml")).context("read sink.yaml")?;
+    let text = std::fs::read_to_string(pack_path().join("sink.yaml")).context("read sink.yaml")?;
     serde_yaml::from_str(&text).context("parse sink.yaml")
 }
 
@@ -435,6 +453,50 @@ fn handle_send(body: &str) -> Value {
     }
 }
 
+fn trajectory_text(record: &Value) -> String {
+    let mut parts = Vec::new();
+    for key in ["themes", "follow_ups"] {
+        if let Some(items) = record[key].as_array() {
+            parts.extend(items.iter().filter_map(|v| v.as_str()).map(str::to_string));
+        }
+    }
+    if let Some(items) = record["commitments"].as_array() {
+        parts.extend(
+            items
+                .iter()
+                .filter_map(|v| v["text"].as_str())
+                .map(str::to_string),
+        );
+    }
+    parts.join("\n")
+}
+
+fn handle_trajectory(body: &str) -> Value {
+    let input: Value = match serde_json::from_str(body) {
+        Ok(v) => v,
+        Err(e) => return json!({"ok": false, "error": format!("parse request body: {e}")}),
+    };
+    let text = trajectory_text(&input["record"]);
+    if text.trim().is_empty() {
+        return json!({"ok": false, "error": "trajectory record is empty"});
+    }
+    let pack = match Pack::load(&pack_path()).context("load coach-session pack") {
+        Ok(p) => p,
+        Err(e) => return json!({"ok": false, "error": format!("{e:#}")}),
+    };
+    match VerifierGate::new(&pack.rules).check(&text) {
+        GateDecision::Pass => {
+            let count = TRAJECTORY_COUNT.fetch_add(1, Ordering::SeqCst) + 1;
+            json!({"ok": true, "count": count})
+        }
+        GateDecision::Block { residual } => json!({
+            "ok": false,
+            "error": "trajectory gate blocked residual identifiers",
+            "residual_count": residual.len()
+        }),
+    }
+}
+
 fn recognizer_overlay() -> Value {
     json!({
         "name": "coach_custom_benefit_id",
@@ -445,15 +507,16 @@ fn recognizer_overlay() -> Value {
 }
 
 fn find_with_pack_rules(text: &str) -> Result<Vec<Span>> {
-    let pack = Pack::load(Path::new(PACK_DIR)).context("load coach-session pack")?;
+    let pack = Pack::load(&pack_path()).context("load coach-session pack")?;
     Ok(pack.rules.find(text))
 }
 
 fn find_with_overlay(text: &str) -> Result<(Vec<Span>, String, bool)> {
-    let pack = Pack::load(Path::new(PACK_DIR)).context("load coach-session pack")?;
+    let pack = Pack::load(&pack_path()).context("load coach-session pack")?;
     let mut rules = RulesExecutor::new();
-    rules.load_recognizer_file(&Path::new(PACK_DIR).join("recognizers/members.json"))?;
-    rules.load_recognizer_file(&Path::new(PACK_DIR).join("recognizers/people.json"))?;
+    let pack_dir = pack_path();
+    rules.load_recognizer_file(&pack_dir.join("recognizers/members.json"))?;
+    rules.load_recognizer_file(&pack_dir.join("recognizers/people.json"))?;
     rules.add_regex("BENEFIT_ID", r"\bBEN-[A-Z]{2}-\d{4}\b")?;
     let res = scrub(text, &rules, None, Sampling::greedy(), 1)?;
     let gate_pass = res.gate.is_pass();
@@ -467,7 +530,8 @@ fn handle_pack_demo() -> Value {
     let before = find_with_pack_rules(note).unwrap_or_default();
     let (after, scrubbed, gate_pass) =
         find_with_overlay(note).unwrap_or_else(|_| (Vec::new(), note.to_string(), false));
-    let pack = Pack::load(Path::new(PACK_DIR));
+    let pack_dir = pack_path();
+    let pack = Pack::load(&pack_dir);
     let (reward, scope) = match pack {
         Ok(p) => (
             p.validate_reward_lint().is_ok(),
@@ -476,8 +540,8 @@ fn handle_pack_demo() -> Value {
         Err(_) => (false, false),
     };
     json!({
-        "pack_yaml": std::fs::read_to_string(Path::new(PACK_DIR).join("pack.yaml")).unwrap_or_default(),
-        "policy_yaml": std::fs::read_to_string(Path::new(PACK_DIR).join("policy.yaml")).unwrap_or_default(),
+        "pack_yaml": std::fs::read_to_string(pack_dir.join("pack.yaml")).unwrap_or_default(),
+        "policy_yaml": std::fs::read_to_string(pack_dir.join("policy.yaml")).unwrap_or_default(),
         "added_recognizer": recognizer_overlay(),
         "note": note,
         "before_count": before.len(),
@@ -485,7 +549,7 @@ fn handle_pack_demo() -> Value {
         "scrubbed_text": scrubbed,
         "gate_pass": gate_pass,
         "gates": [
-            {"name":"pack-blindness","pass": Pack::validate_blindness(Path::new(PACK_DIR)).is_ok()},
+            {"name":"pack-blindness","pass": Pack::validate_blindness(&pack_path()).is_ok()},
             {"name":"reward-lint","pass": reward},
             {"name":"scope-boundary","pass": scope},
             {"name":"eval smoke","pass": gate_pass && after.iter().any(|s| s.entity == "BENEFIT_ID")}
@@ -527,7 +591,9 @@ fn main() -> Result<()> {
                 .unwrap_or_else(|_| "#coach-records".to_string());
             println!("  slack:   SLACK_BOT_TOKEN set — records post to {route}")
         }
-        Err(_) => println!("  slack:   NOT set — export SLACK_WEBHOOK_URL or SLACK_BOT_TOKEN to post for real"),
+        Err(_) => println!(
+            "  slack:   NOT set — export SLACK_WEBHOOK_URL or SLACK_BOT_TOKEN to post for real"
+        ),
     }
 
     for mut req in server.incoming_requests() {
@@ -579,6 +645,13 @@ fn main() -> Result<()> {
                 let _ =
                     req.respond(tiny_http::Response::from_string(payload).with_header(json_header));
             }
+            ("POST", "/api/trajectory") => {
+                let mut body = String::new();
+                let _ = req.as_reader().read_to_string(&mut body);
+                let payload = handle_trajectory(&body).to_string();
+                let _ =
+                    req.respond(tiny_http::Response::from_string(payload).with_header(json_header));
+            }
             _ => {
                 let _ = req
                     .respond(tiny_http::Response::from_string("not found").with_status_code(404));
@@ -591,6 +664,9 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    static TRAJECTORY_TEST_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn fallback_themes_are_grounded_for_sample_note() {
@@ -650,5 +726,40 @@ credentials:
         .unwrap();
         assert_eq!(slack_channel(&sink), "#coach-records");
         assert_eq!(sink.credentials.keychain_ref(), "slack-bot-token");
+    }
+
+    #[test]
+    fn trajectory_gate_blocks_residual_identifier_without_increment() {
+        let _guard = TRAJECTORY_TEST_LOCK.lock().unwrap();
+        let before = TRAJECTORY_COUNT.load(Ordering::SeqCst);
+        let blocked = handle_trajectory(
+            r#"{"record":{"themes":["member CM-204815"],"commitments":[],"follow_ups":[]}}"#,
+        );
+        assert_eq!(blocked["ok"], false, "{blocked}");
+        assert_eq!(blocked["residual_count"], 1, "{blocked}");
+        assert_eq!(TRAJECTORY_COUNT.load(Ordering::SeqCst), before);
+    }
+
+    #[test]
+    fn trajectory_gate_increments_for_clean_record() {
+        let _guard = TRAJECTORY_TEST_LOCK.lock().unwrap();
+        let before = TRAJECTORY_COUNT.load(Ordering::SeqCst);
+        let accepted = handle_trajectory(
+            r#"{"record":{"themes":["daily movement"],"commitments":[{"text":"morning walk"}],"follow_ups":["Try this once on your own."]}}"#,
+        );
+        assert_eq!(accepted["ok"], true, "{accepted}");
+        assert_eq!(accepted["count"].as_u64().unwrap(), (before + 1) as u64);
+    }
+
+    #[test]
+    fn trajectory_gate_rejects_empty_or_invalid_records() {
+        let _guard = TRAJECTORY_TEST_LOCK.lock().unwrap();
+        let before = TRAJECTORY_COUNT.load(Ordering::SeqCst);
+        let invalid = handle_trajectory(r#"{"#);
+        let empty =
+            handle_trajectory(r#"{"record":{"themes":[],"commitments":[],"follow_ups":[]}}"#);
+        assert_eq!(invalid["ok"], false, "{invalid}");
+        assert_eq!(empty["ok"], false, "{empty}");
+        assert_eq!(TRAJECTORY_COUNT.load(Ordering::SeqCst), before);
     }
 }
