@@ -42,12 +42,12 @@ The agent will start at **M0** (author the `coach-session` pack + ~20 golden not
         rules executor · verifier gate · pipeline · pack loader
         depends only on PORTS:  InferenceProvider · SecureStore · Capture · Sink
                  ▲                      ▲                       ▲
-            iOS shell              CLI shell               MCP/agent shell
-        mlx-swift · Enclave    llama-server · file      same core · tool I/O
-        "data never leaves"    "numbers reproduce"      "an agent can too"
+         web shell (live)          CLI shell             MCP · iOS (planned)
+        browser · laptop-edge  llama-server · file      same core, more reach
+        "Beat 1, on any phone"  "numbers reproduce"     "an agent / a device too"
 ```
 
-The **identical** recall-critical logic runs across all three — which is what makes a reproduced number meaningful and the repatriation real, not asserted. The model is a *port*, not baked in.
+The **identical** recall-critical logic runs across every shell — which is what makes a reproduced number meaningful and the repatriation real, not asserted. The model is a *port*, not baked in.
 
 ## Make it yours in five files
 
@@ -78,6 +78,6 @@ On managed/corporate/guest Wi-Fi that blocks device-to-device traffic, use your 
 | `AGENTS.md` · `CLAUDE.md` | the build-loop operating manual |
 | `backlog/` | the M0–M5 work queue the loop pulls from |
 | `crates/airplane-core/` · `shells/` · `packs/` · `gates/` | where the build lands |
-| `run.sh` | the one entrypoint: `eval · demo · scrub · gates` |
+| `run.sh` | the one entrypoint: `eval · scrub · gates · web` |
 
 *Built to make intelligence come to the data — not the other way around.*

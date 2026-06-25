@@ -43,12 +43,3 @@ pub trait Capture {
 pub trait Sink {
     fn deliver(&self, record: &str) -> Result<()>;
 }
-
-/// A no-op provider — lets the pipeline run rules-only (no model), and serves as the
-/// minimal example of implementing the port.
-pub struct NoModel;
-impl InferenceProvider for NoModel {
-    fn complete(&self, _req: &InferenceRequest<'_>) -> Result<String> {
-        Ok(r#"{"spans":[]}"#.to_string())
-    }
-}
