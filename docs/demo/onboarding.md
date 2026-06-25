@@ -5,7 +5,7 @@ Run the on-device PHI-scrub demo on a phone in about five minutes: a clean web s
 ## Prerequisites
 
 - The repo checked out at `~/projects/iphone-phi-scrubber-demo`. (Architecture context: `CANON.md`, `shells/web/README.md`.)
-- The PrismML Bonsai model available locally (`~/projects/bonsai`). Footguns are documented in `docs/seed/bonsai-ecosystem-brief.md`.
+- The PrismML Bonsai model + llama.cpp (one-time setup in **docs/model-setup.md**; `./scripts/serve-model.sh` fetches and serves it).
 - A Mac and an iPhone with Safari.
 - Keep the Mac awake and plugged in for the whole demo.
 
@@ -15,7 +15,7 @@ You need **both** running at the same time, in two terminals.
 
 1. **Model server** (PrismML Bonsai via stock `llama-server`, OpenAI-compatible, default F16 on Metal):
    ```sh
-   ~/projects/bonsai/scripts/serve.sh
+   ./scripts/serve-model.sh
    ```
    This listens on `127.0.0.1:8080`.
 

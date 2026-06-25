@@ -20,7 +20,7 @@ Airplane Mode — run.sh   (on-device PHI scrubber; CLI shell over airplane-core
   ./run.sh gates           run the harness gates
   ./run.sh web             serve the Beat 1 demo UI (http://localhost:8088, LAN-accessible)
 
-Needs the model layer running:  ~/projects/bonsai/scripts/serve.sh
+Needs the model layer running:  ./scripts/serve-model.sh
 Tune contextual passes:         AIRPLANE_EVAL_PASSES=5 ./run.sh eval
 EOF
   ;;

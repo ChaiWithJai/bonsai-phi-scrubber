@@ -61,6 +61,7 @@
     font:400 14.5px/1.65 var(--sans);color:#3a352c;flex:1;min-height:0;overflow:auto;width:100%;resize:none;outline:none}
   .chip{font:600 11px var(--sans);color:#3a352c;background:#efe9da;border-radius:8px;padding:5px 9px;display:inline-block}
   .pill{font:600 9px/1 var(--mono);border-radius:20px;padding:4px 8px;display:inline-flex;align-items:center;gap:4px}
+  .code{font:500 10.5px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;color:#4f493f;background:#f7f1e5;border:1px solid var(--line);border-radius:10px;padding:10px}
   .mono{font-family:var(--mono)}
   .grow{flex:1;min-height:0}
   .center{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
@@ -86,7 +87,7 @@
 
 <script>
 const NOTE = "Met with Maria Alvarez (CM-204815) at her place Tuesday. She's the one whose daughter just started college. Committed to a 10-min morning walk daily.";
-const S = { airplane:true, screen:'capturing', note:'', result:null, error:null, posted:false, sendNote:'' };
+const S = { airplane:true, screen:'capturing', note:'', result:null, error:null, posted:false, sendNote:'', packDemo:null, packError:null };
 
 const $phone = document.getElementById('phone');
 const $screen = document.getElementById('screen');
@@ -131,7 +132,7 @@ const screens = {
      <div style="font:700 18px var(--sans);color:#f3eee2">Couldn't scrub</div>
      <div class="dbox" style="margin-top:15px;padding:16px;border-color:#5c2e27;color:#cdb1a8;font:400 13.5px/1.6 var(--sans)">
        ${esc(S.error)}
-       <div class="mono" style="font-size:11px;color:#8c8475;margin-top:12px">The model server must be running on the laptop:<br>~/projects/bonsai/scripts/serve.sh</div></div>
+       <div class="mono" style="font-size:11px;color:#8c8475;margin-top:12px">The model server must be running on the laptop:<br>./scripts/serve-model.sh</div></div>
      <div class="grow"></div>
      <button class="btn" data-act="retry" style="background:var(--red);margin-bottom:12px">Try again</button>
      <span data-act="back" class="mono" style="font-size:12px;color:#8c8475;text-align:center;cursor:pointer">← back to the note</span>`; }
@@ -259,7 +260,48 @@ const screens = {
      <div style="display:flex;justify-content:space-between;font-size:12px;color:#736c5d"><span>identifiers sent</span><span style="color:var(--green);font-weight:700">0</span></div>
      <div style="display:flex;justify-content:space-between;font-size:12px;color:#736c5d"><span>raw note left the edge</span><span style="color:var(--green);font-weight:700">never</span></div></div>
    <div style="font:600 15px/1.4 var(--sans);margin-top:14px;letter-spacing:-.01em">The real name never reached the cloud. Only this did.</div>
-   <button class="btn" data-act="slack" style="margin-top:12px;background:#3a1f3a">View in #coach-records</button>`; },
+   <div style="display:flex;gap:9px;margin-top:12px">
+     <button class="btn" data-act="slack" style="background:#3a1f3a;padding:14px">View Slack</button>
+     <button class="btn" data-act="pack" style="background:var(--ink);padding:14px">Pack reveal</button>
+   </div>`; },
+
+ pack(){ setDark(false);
+   if(S.packError){ return `
+     <div style="font:700 17px var(--sans)">Pack reveal</div>
+     <div style="margin-top:14px;background:#fff1ed;border:1.5px solid #e5b2a8;border-radius:16px;padding:15px;color:#884035;font:500 13px/1.55 var(--sans)">${esc(S.packError)}</div>
+     <div class="grow"></div>
+     <button class="btn" data-act="packRetry">Retry</button>`; }
+   if(!S.packDemo){ return `
+     <div style="font:700 17px var(--sans)">Pack reveal</div>
+     <div class="grow center" style="gap:14px">
+       <div style="width:52px;height:52px;border-radius:15px;border:2px solid #e3c98a;display:flex;align-items:center;justify-content:center;color:var(--gold);font:700 18px var(--mono)">5</div>
+       <div class="sub">Opening the five-file pack and staging one recognizer.</div>
+     </div>`; }
+   const d=S.packDemo;
+   const added=JSON.stringify(d.added_recognizer,null,2);
+   const caught=(d.after_redactions||[]).find(r=>r.entity==='BENEFIT_ID');
+   return `
+   <div style="display:flex;align-items:center;justify-content:space-between">
+     <div style="font:700 17px var(--sans);letter-spacing:-.01em">Pack reveal</div>
+     <span class="pill" style="color:var(--green);background:#e6f0e7;border:1px solid #bfdcc6">NO FORK</span></div>
+   <div style="margin-top:12px;display:flex;gap:7px;flex-wrap:wrap">
+     ${(d.gates||[]).map(g=>`<span class="pill" style="color:${g.pass?'var(--green)':'var(--red)'};background:${g.pass?'#e6f0e7':'#fff1ed'};border:1px solid ${g.pass?'#bfdcc6':'#e5b2a8'}">${g.pass?'✓':'×'} ${esc(g.name)}</span>`).join('')}</div>
+   <div style="flex:1;min-height:0;margin-top:12px;overflow:auto;display:flex;flex-direction:column;gap:10px">
+     <div>
+       <div class="mono" style="font-size:10px;color:#a39a86;letter-spacing:.05em;margin-bottom:5px">ADDED RECOGNIZER</div>
+       <div class="code">${esc(added)}</div>
+     </div>
+     <div>
+       <div class="mono" style="font-size:10px;color:#a39a86;letter-spacing:.05em;margin-bottom:5px">RE-SCRUBBED NOTE</div>
+       <div style="background:var(--card);border:1.5px solid var(--line);border-radius:12px;padding:12px;font:500 13px/1.55 var(--sans)">${esc(d.scrubbed_text)}</div>
+     </div>
+     <div style="display:flex;align-items:center;justify-content:space-between;background:${caught?'#e6f0e7':'#fff1ed'};border:1.5px solid ${caught?'#bfdcc6':'#e5b2a8'};border-radius:12px;padding:12px">
+       <div><div class="mono" style="font-size:10px;color:#6f806f">NEW IDENTIFIER</div>
+       <div style="font:700 14px var(--sans);margin-top:4px">${caught?esc(caught.text):'not caught'}</div></div>
+       <div class="mono" style="font:800 18px var(--mono);color:${caught?'var(--green)':'var(--red)'}">${caught?'CAUGHT':'BLOCK'}</div>
+     </div>
+   </div>
+   <button class="btn" data-act="backRecord" style="margin-top:12px">Back to record</button>`; },
 };
 
 // ---------- helpers ----------
@@ -286,6 +328,9 @@ async function onAct(e){
   if(act==='record') return go('record');
   if(act==='send') return go(S.airplane ? 'held' : 'flush');
   if(act==='slack') return showSlack();
+  if(act==='pack'){ go('pack'); return doPackReveal(); }
+  if(act==='packRetry'){ S.packDemo=null; S.packError=null; go('pack'); return doPackReveal(); }
+  if(act==='backRecord') return go('delivered');
 }
 
 async function doScrub(){
@@ -308,6 +353,18 @@ async function doSend(){
   const [data] = await Promise.all([post, new Promise(r=>setTimeout(r,1900))]);
   S.posted = !!data.ok; S.sendNote = data.ok ? '' : (data.error||'');
   go('delivered');
+}
+
+async function doPackReveal(){
+  S.packDemo=null; S.packError=null;
+  if(S.screen==='pack') render();
+  try{
+    const res = await fetch('/api/pack-demo');
+    const data = await res.json().catch(()=>({error:'pack endpoint returned '+res.status}));
+    if(!res.ok || data.error) throw new Error(data.error || ('pack endpoint returned '+res.status));
+    S.packDemo=data;
+  }catch(err){ S.packError=(err && err.message)||'could not run the pack reveal'; }
+  if(S.screen==='pack') render();
 }
 
 function showSlack(){

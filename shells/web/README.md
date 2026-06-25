@@ -9,7 +9,7 @@ the structurer runs only on the already-de-identified text.
 ## Run it
 
 ```bash
-~/projects/bonsai/scripts/serve.sh    # the model layer (separate terminal)
+./scripts/serve-model.sh    # the model layer (separate terminal)
 ./run.sh web                          # serves http://localhost:8088 and prints a LAN URL
 ```
 
