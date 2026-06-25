@@ -9,8 +9,8 @@ Every ethical, legal, and security requirement is an automated check that gates 
 | `pack-blindness` | trust boundary — pack has no code, no PHI access, creds sourced not stored | M1 |
 | **`reward-lint` ★** | anti-dependence ethic · ADR-012 — reward references autonomy signals only, **no engagement terms** | M2 · live |
 | **`scope-boundary` ★** | coach ≠ therapist — escalation path present, no clinical-claim language | M2 · live |
-| `signature/provenance` | supply-chain trust — keyless-signed, provenance present | M4+ |
-| `manifest/revocation` | version integrity — signed monotonic version, not revoked | M4+ |
+| `signature/provenance` | supply-chain trust — keyless metadata, provenance present | M4 · live |
+| `manifest/revocation` | version integrity — signed monotonic manifest, current artifacts not revoked | M4 · live |
 | `PHI-free-telemetry` | no backdoor — telemetry = version/health only, never content | M5+ |
 
 ★ = our contribution; no k8s/CNCF analog. The two ethical gates are the beat no other system can show.

@@ -15,10 +15,11 @@ use std::path::{Path, PathBuf};
 struct PackFile {
     metadata: Meta,
     spec: Spec,
+    #[serde(default)]
+    signature: Signature,
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct Meta {
     name: String,
     version: String,
@@ -31,6 +32,76 @@ struct Spec {
     recognizers: Vec<String>,
     #[serde(default)]
     policy: String,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Signature {
+    #[serde(default)]
+    keyless: bool,
+    #[serde(default)]
+    issuer: String,
+    #[serde(default)]
+    identity: String,
+    #[serde(default)]
+    rekor_log: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct ProvenanceFile {
+    subject: ProvenanceSubject,
+    builder: ProvenanceBuilder,
+    source: ProvenanceSource,
+    #[serde(default)]
+    signature: Signature,
+}
+
+#[derive(Debug, Deserialize)]
+struct ProvenanceSubject {
+    kind: String,
+    name: String,
+    version: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct ProvenanceBuilder {
+    id: String,
+    workflow: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct ProvenanceSource {
+    repository: String,
+    #[serde(rename = "ref")]
+    ref_name: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ManifestFile {
+    sequence: u64,
+    previous_sequence: u64,
+    current: ManifestCurrent,
+    #[serde(default)]
+    revoked: Vec<RevokedArtifact>,
+    #[serde(default)]
+    signature: Signature,
+}
+
+#[derive(Debug, Deserialize)]
+struct ManifestCurrent {
+    core: String,
+    model: String,
+    pack: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct RevokedArtifact {
+    #[serde(default)]
+    pack: String,
+    #[serde(default)]
+    model: String,
+    reason: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -139,6 +210,82 @@ impl Pack {
         Ok(())
     }
 
+    /// `signature/provenance`: the pack must carry keyless signing metadata and a
+    /// PHI-free provenance document whose subject matches the pack.
+    pub fn validate_signature_provenance(dir: &Path) -> Result<()> {
+        let pf: PackFile = serde_yaml::from_str(
+            &std::fs::read_to_string(dir.join("pack.yaml")).context("read pack.yaml")?,
+        )
+        .context("parse pack.yaml")?;
+        if pf.metadata.target_core.trim().is_empty() {
+            bail!("pack.metadata.targetCore must be set for provenance validation");
+        }
+        validate_signature("pack.signature", &pf.signature)?;
+
+        let prov: ProvenanceFile = serde_yaml::from_str(
+            &std::fs::read_to_string(dir.join("provenance.yaml"))
+                .context("read provenance.yaml")?,
+        )
+        .context("parse provenance.yaml")?;
+        validate_signature("provenance.signature", &prov.signature)?;
+        if prov.subject.kind != "Pack"
+            || prov.subject.name != pf.metadata.name
+            || prov.subject.version != pf.metadata.version
+        {
+            bail!("provenance subject does not match pack metadata");
+        }
+        if prov.builder.id.trim().is_empty() || prov.builder.workflow.trim().is_empty() {
+            bail!("provenance.builder must identify the release workflow");
+        }
+        if prov.source.repository.trim().is_empty() || prov.source.ref_name.trim().is_empty() {
+            bail!("provenance.source must identify repository and ref");
+        }
+        Ok(())
+    }
+
+    /// `manifest/revocation`: the manifest must be keyless-signed, monotonic, point
+    /// at the current pack, and must not revoke the current pack/model.
+    pub fn validate_manifest_revocation(manifest_path: &Path, pack_dir: &Path) -> Result<()> {
+        let manifest: ManifestFile = serde_yaml::from_str(
+            &std::fs::read_to_string(manifest_path).context("read manifest.yaml")?,
+        )
+        .context("parse manifest.yaml")?;
+        validate_signature("manifest.signature", &manifest.signature)?;
+        if manifest.sequence <= manifest.previous_sequence {
+            bail!("manifest sequence must increase monotonically");
+        }
+        if manifest.current.core.trim().is_empty() || manifest.current.model.trim().is_empty() {
+            bail!("manifest current core/model must be set");
+        }
+
+        let pf: PackFile = serde_yaml::from_str(
+            &std::fs::read_to_string(pack_dir.join("pack.yaml")).context("read pack.yaml")?,
+        )
+        .context("parse pack.yaml")?;
+        let current_pack = format!("{}@{}", pf.metadata.name, pf.metadata.version);
+        if manifest.current.pack != current_pack {
+            bail!(
+                "manifest current pack `{}` does not match loaded pack `{current_pack}`",
+                manifest.current.pack
+            );
+        }
+        for revoked in &manifest.revoked {
+            if revoked.reason.trim().is_empty() {
+                bail!("revocation entries must include a reason");
+            }
+            if revoked.pack == current_pack {
+                bail!("manifest revokes current pack `{current_pack}`");
+            }
+            if !revoked.model.trim().is_empty() && revoked.model == manifest.current.model {
+                bail!(
+                    "manifest revokes current model `{}`",
+                    manifest.current.model
+                );
+            }
+        }
+        Ok(())
+    }
+
     /// `reward-lint`: reward references may use autonomy signals only, never the
     /// configured engagement/dependence terms. `forbiddenTerms` itself is the deny-list
     /// declaration, so it is not treated as a violation.
@@ -221,6 +368,22 @@ fn normalize_term(s: &str) -> String {
     s.trim().to_ascii_lowercase().replace('-', "_")
 }
 
+fn validate_signature(path: &str, sig: &Signature) -> Result<()> {
+    if !sig.keyless {
+        bail!("{path}.keyless must be true");
+    }
+    for (field, value) in [
+        ("issuer", sig.issuer.as_str()),
+        ("identity", sig.identity.as_str()),
+        ("rekorLog", sig.rekor_log.as_str()),
+    ] {
+        if value.trim().is_empty() || value.contains('<') || value.contains('>') {
+            bail!("{path}.{field} must be populated with non-placeholder metadata");
+        }
+    }
+    Ok(())
+}
+
 fn collect_clinical_claims(
     value: &serde_yaml::Value,
     path: &mut Vec<String>,
@@ -272,6 +435,7 @@ fn collect_clinical_claims(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     fn pack_from_policy(policy_text: &str) -> Pack {
         let policy_raw: serde_yaml::Value = serde_yaml::from_str(policy_text).unwrap();
@@ -330,5 +494,61 @@ followup:
         );
         assert!(pack.validate_reward_lint().is_ok());
         assert!(pack.validate_scope_boundary().is_ok());
+    }
+
+    #[test]
+    fn signature_rejects_placeholders() {
+        let sig = Signature {
+            keyless: true,
+            issuer: "https://token.actions.githubusercontent.com".into(),
+            identity: "repo/workflow".into(),
+            rekor_log: "<uuid-after-signing>".into(),
+        };
+        assert!(validate_signature("pack.signature", &sig).is_err());
+    }
+
+    #[test]
+    fn signature_accepts_keyless_metadata() {
+        let sig = Signature {
+            keyless: true,
+            issuer: "https://token.actions.githubusercontent.com".into(),
+            identity: "repo/workflow".into(),
+            rekor_log: "00000000-0000-4000-8000-000000000001".into(),
+        };
+        assert!(validate_signature("pack.signature", &sig).is_ok());
+    }
+
+    #[test]
+    fn manifest_rejects_revoked_current_pack() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("airplane-pack-test-{nonce}"));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("pack.yaml"),
+            r#"
+metadata: { name: coach-session, version: 1.0.0, targetCore: ">=1.0.0 <2.0.0" }
+spec: { recognizers: [] }
+signature: { keyless: true, issuer: test, identity: test, rekorLog: "00000000-0000-4000-8000-000000000001" }
+"#,
+        )
+        .unwrap();
+        let manifest = dir.join("manifest.yaml");
+        std::fs::write(
+            &manifest,
+            r#"
+sequence: 2
+previousSequence: 1
+current: { core: 0.1.0, model: "ternary-bonsai-1.7b@local-gguf", pack: "coach-session@1.0.0" }
+revoked:
+  - { pack: "coach-session@1.0.0", reason: "recall regression" }
+signature: { keyless: true, issuer: test, identity: test, rekorLog: "00000000-0000-4000-8000-000000000002" }
+"#,
+        )
+        .unwrap();
+        assert!(Pack::validate_manifest_revocation(&manifest, &dir).is_err());
+        let _ = std::fs::remove_dir_all(dir);
     }
 }

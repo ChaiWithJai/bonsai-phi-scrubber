@@ -1,17 +1,15 @@
 apiVersion: airplane/v1
-kind: Pack
-metadata:
+kind: Provenance
+subject:
+  kind: Pack
   name: coach-session
   version: 1.0.0
-  targetCore: ">=1.0.0 <2.0.0"
-spec:
-  recognizers:
-    - recognizers/members.json
-    - recognizers/people.json
-  schema: schema.yaml
-  policy: policy.yaml
-  sink:   sink.yaml
-  eval:   eval/
+builder:
+  id: github-actions
+  workflow: release.yml
+source:
+  repository: https://github.com/ChaiWithJai/airplane-mode
+  ref: refs/heads/main
 signature:
   keyless: true
   issuer: https://token.actions.githubusercontent.com

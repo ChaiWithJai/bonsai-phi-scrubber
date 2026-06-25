@@ -244,6 +244,20 @@ fn cmd_gates() -> Result<()> {
             failed = true;
         }
     }
+    match Pack::validate_signature_provenance(&pack_dir) {
+        Ok(()) => println!("gate signature/prov : PASS"),
+        Err(e) => {
+            println!("gate signature/prov : FAIL — {e}");
+            failed = true;
+        }
+    }
+    match Pack::validate_manifest_revocation(Path::new("manifest.yaml"), &pack_dir) {
+        Ok(()) => println!("gate manifest/revoke: PASS"),
+        Err(e) => {
+            println!("gate manifest/revoke: FAIL — {e}");
+            failed = true;
+        }
+    }
 
     // recall + leakage (needs the model)
     let pack = Pack::load(&pack_dir)?;
