@@ -81,6 +81,16 @@ impl RulesExecutor {
         Ok(())
     }
 
+    /// Add one regex recognizer at runtime. Shells use this for demos or adapters that
+    /// stage declarative pack changes before writing/signing a pack artifact.
+    pub fn add_regex(&mut self, entity: impl Into<String>, regex: &str) -> Result<()> {
+        self.patterns.push(CompiledPattern {
+            entity: entity.into(),
+            re: Regex::new(regex).with_context(|| format!("compile staged regex `{regex}`"))?,
+        });
+        Ok(())
+    }
+
     /// All structured-identifier spans found in `text`.
     pub fn find(&self, text: &str) -> Vec<Span> {
         let mut spans = Vec::new();

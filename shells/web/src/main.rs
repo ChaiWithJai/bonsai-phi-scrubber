@@ -14,7 +14,7 @@ use std::path::Path;
 
 const PACK_DIR: &str = "packs/coach-session";
 const INDEX: &str = "shells/web/static/index.html";
-const ADDR: &str = "0.0.0.0:8088";
+const DEFAULT_ADDR: &str = "0.0.0.0:8088";
 const PASSES: u32 = 5;
 
 // ---- llama-server adapter (InferenceProvider port, web side) -----------------
@@ -257,8 +257,8 @@ fn find_with_overlay(text: &str) -> Result<(Vec<Span>, String, bool)> {
     rules.add_regex("BENEFIT_ID", r"\bBEN-[A-Z]{2}-\d{4}\b")?;
     let res = scrub(text, &rules, None, Sampling::greedy(), 1)?;
     let gate_pass = res.gate.is_pass();
-    let _ = pack.validate_reward_lint()?;
-    let _ = pack.validate_scope_boundary()?;
+    pack.validate_reward_lint()?;
+    pack.validate_scope_boundary()?;
     Ok((res.redaction_map, res.scrubbed_text, gate_pass))
 }
 
@@ -310,11 +310,13 @@ fn local_ips() -> Vec<String> {
 }
 
 fn main() -> Result<()> {
-    let server = tiny_http::Server::http(ADDR).map_err(|e| anyhow::anyhow!("bind {ADDR}: {e}"))?;
+    let addr = std::env::var("AIRPLANE_WEB_ADDR").unwrap_or_else(|_| DEFAULT_ADDR.to_string());
+    let server = tiny_http::Server::http(&addr).map_err(|e| anyhow::anyhow!("bind {addr}: {e}"))?;
+    let port = addr.rsplit_once(':').map(|(_, p)| p).unwrap_or("8088");
     println!("Airplane Mode — web shell");
-    println!("  local:   http://localhost:8088");
+    println!("  local:   http://localhost:{port}");
     for ip in local_ips() {
-        println!("  phone:   http://{ip}:8088   (same Wi-Fi / hotspot)");
+        println!("  phone:   http://{ip}:{port}   (same Wi-Fi / hotspot)");
     }
     println!("  needs the model:  ./scripts/serve-model.sh");
     match std::env::var("SLACK_WEBHOOK_URL") {
