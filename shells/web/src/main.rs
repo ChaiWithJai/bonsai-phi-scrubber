@@ -810,6 +810,15 @@ fn model_status() -> Value {
     })
 }
 
+fn network_status(http_port: &str) -> Value {
+    let https_port = std::env::var("AIRPLANE_HTTPS_PORT").unwrap_or_else(|_| "8443".to_string());
+    json!({
+        "ips": local_ips(),
+        "http_port": http_port,
+        "https_port": https_port
+    })
+}
+
 fn client_capability_store() -> &'static Mutex<Option<Value>> {
     CLIENT_CAPABILITY.get_or_init(|| Mutex::new(None))
 }
@@ -1458,6 +1467,7 @@ fn main() -> Result<()> {
                     "ok": true,
                     "slack": slack_status(),
                     "model": model_status(),
+                    "network": network_status(port),
                     "client_capability": latest_client_capability(),
                     "browser_requests": latest_browser_requests()
                 })

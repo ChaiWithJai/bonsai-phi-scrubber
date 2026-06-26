@@ -401,8 +401,9 @@ but Safari stalls or rejects `navigator.gpu.requestAdapter()` before
 
 For live demos, open `/proof` on the laptop. It is a PHI-free operator view over
 `/api/status`: Slack health, local model health, latest phone capability, and
-recent browser-surface requests. It is deliberately separate from the scrub flow
-so proof gathering cannot capture note text.
+recent browser-surface requests. It also prints the current phone URLs from the
+edge server's LAN interfaces. It is deliberately separate from the scrub flow so
+proof gathering cannot capture note text.
 
 ## Optimal Path From Here
 

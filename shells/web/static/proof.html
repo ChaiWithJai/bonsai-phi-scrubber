@@ -53,19 +53,30 @@
 const $ = id => document.getElementById(id);
 function cls(el, ok, warn=false){ el.className = 'value ' + (ok ? 'ok' : (warn ? 'warn' : 'bad')); }
 function esc(s){ return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-function phoneOrigin(){
-  const host = location.host;
-  return `${location.protocol}//${host}`;
+function currentOrigin(){
+  return `${location.protocol}//${location.host}`;
+}
+function phoneUrls(data){
+  const n = data.network || {};
+  const ips = Array.isArray(n.ips) ? n.ips : [];
+  const httpPort = n.http_port || '8099';
+  const httpsPort = n.https_port || '8443';
+  const urls = ips.flatMap(ip=>[
+    `https://${ip}:${httpsPort}/`,
+    `https://${ip}:${httpsPort}/proof`,
+    `http://${ip}:${httpPort}/`
+  ]);
+  return urls.length ? urls : [currentOrigin() + '/'];
 }
 function commandText(){
-  const origin = phoneOrigin();
+  const origin = currentOrigin();
   return `AIRPLANE_WEB_URL=${origin} ./run.sh phone-observe\nAIRPLANE_WEB_URL=${origin} ./run.sh phone-request-observe\nAIRPLANE_WEB_URL=${origin} ./run.sh browser-span-smoke`;
 }
 async function refresh(){
-  $('phoneUrl').textContent = phoneOrigin() + '/';
-  $('commands').textContent = commandText();
   const res = await fetch('/api/status', {cache:'no-store'});
   const data = await res.json();
+  $('phoneUrl').textContent = phoneUrls(data).join('\n');
+  $('commands').textContent = commandText();
   $('raw').textContent = JSON.stringify(data, null, 2);
 
   const slackOk = !!data.slack?.configured;
