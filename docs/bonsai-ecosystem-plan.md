@@ -10,7 +10,7 @@
 
 I'm a product engineer who builds by **dogfooding**: I ship the thing, in public, and turn the build into something other people can use and learn from. I run a product studio, **[trydogfooding.com](https://trydogfooding.com)**, and I make **cinematic documentaries and real use cases for AI** at **[chaiwithjai.com](https://chaiwithjai.com)** — in partnership with **STG @ KVibe Studios** (Taso Z and Khoa Le). I'm also **adjunct faculty**, which matters here more than it sounds: how I teach is how I'd build this community.
 
-This note shows the work, not just describes it. The first case study — an on-device PHI scrubber built on Bonsai — already lives in this repo ([README](../README.md), [how the demo works](demo/how-the-demo-works.md)).
+This note shows the work, not just describes it. The first case study — a first-party edge PHI scrubber built on Bonsai — already lives in this repo ([README](../README.md), [how the demo works](demo/how-the-demo-works.md)).
 
 ## Why ecosystem, and why this way
 
