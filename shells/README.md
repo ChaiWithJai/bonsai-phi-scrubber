@@ -5,7 +5,7 @@ Each shell is a thin adapter that injects concrete implementations of the four `
 | Shell | Built at | `InferenceProvider` | `SecureStore` | `Capture` | `Sink` | Proves |
 |---|---|---|---|---|---|---|
 | `cli/` | **M1** | llama-server HTTP (grammar server-side) | encrypted file | stdin/arg | mock/stdout/Slack | reproduction (Tier 1) |
-| `ios/` | M3 | mlx-swift, MLX weights (grammar client-side) | Secure Enclave | ASR + UI | Slack Block Kit | "the data never leaves" |
+| `ios/` | M3 | mlx-swift, MLX weights (grammar client-side) | Secure Enclave | ASR + UI | Slack Block Kit | planned hardware proof; current scaffold is simulator-only |
 | `mcp/` | **M4** | llama-server HTTP (shared w/ CLI) | ephemeral/file | MCP tool-call | gate-clean tool-result | "an agent can do it too" |
 
 **North-star (architected, not built in v1):** `server/`, `wasm/`. The port traits are the proof you could add them — the README shows how. Don't scaffold them speculatively (Hard Rule 7).

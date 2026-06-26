@@ -11,6 +11,7 @@ Cargo.lock
 
 # Swift / iOS
 shells/ios/build/
+shells/ios/.build/
 shells/ios/Pods/
 shells/ios/DerivedData/
 *.xcuserstate
