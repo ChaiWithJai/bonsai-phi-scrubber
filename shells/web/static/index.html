@@ -123,6 +123,14 @@
   .capCell strong{display:block;font:800 13px var(--mono);margin-top:3px;color:var(--ink)}
   .capLinks{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
   .capLinks a{font:800 9px var(--mono);text-decoration:none;color:#245b8f;background:#edf4fb;border:1px solid #c9d9e7;border-radius:999px;padding:5px 8px}
+  .backendChoice{margin-top:10px;border:1px solid #dce2da;background:#ffffff;border-radius:12px;padding:11px 12px}
+  .backendChoice b{display:block;font:800 10px var(--mono);letter-spacing:.04em;color:#a39a86;text-transform:uppercase}
+  .backendBtns{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}
+  .backendBtn{border:1.5px solid #dce2da;border-radius:11px;background:#fbfcfa;padding:9px 7px;text-align:left;cursor:pointer}
+  .backendBtn strong{display:block;font:800 12px/1.15 var(--sans);color:#3a352c}
+  .backendBtn span{display:block;font:700 9px/1.25 var(--mono);color:#8a8273;margin-top:4px}
+  .backendBtn.active{border-color:#c6912f;background:#fff6e3}
+  .backendBtn.active strong{color:#6f430b}
   .sampleBtn{font:700 12px var(--sans);color:var(--gold);background:#f6ecd6;border:1px solid #e3c98a;border-radius:999px;padding:8px 11px;cursor:pointer}
   .noteMeta{display:flex;align-items:center;justify-content:space-between;margin-top:10px}
   .btn.disabled{background:#d9d0bd;color:#8a8273;cursor:default;box-shadow:none}
@@ -155,7 +163,7 @@ const STEPS = new Set(['capturing','scrubbing','gated','record','flush','deliver
 const RESULT_STEPS = new Set(['gated','record','flush','delivered','pack']);
 const DRAFT_KEY = 'airplane-demo-draft-v2';
 const OUTBOX_KEY = 'airplane-demo-send-outbox-v1';
-const S = { screen:'capturing', note:'', result:null, error:null, posted:false, sendNote:'', sendQueued:false, trajectoryCount:0, trajectoryNote:'', packDemo:null, packError:null, listening:false, speechMsg:'', status:null, job:null, capability:null };
+const S = { screen:'capturing', note:'', result:null, error:null, posted:false, sendNote:'', sendQueued:false, trajectoryCount:0, trajectoryNote:'', packDemo:null, packError:null, listening:false, speechMsg:'', status:null, job:null, capability:null, backend:'mac-edge', backendNote:'' };
 let recognizer = null;
 
 const $phone = document.getElementById('phone');
@@ -205,6 +213,28 @@ function capabilityHtml(){
   </div>`;
 }
 
+function backendHtml(){
+  const gpuReady = !!(S.capability && S.capability.webgpu);
+  const active = S.backend || 'mac-edge';
+  const gpuState = gpuReady ? 'capable · adapter next' : 'needs HTTPS/WebGPU';
+  const note = active === 'browser-gpu'
+    ? 'Browser GPU is selected. Today this records the capability gap and fails closed to the Mac-edge verifier until the local Bonsai adapter is wired.'
+    : 'Mac edge is the live path: local Bonsai via llama-server, Rust gate, Slack sink.';
+  return `<div class="backendChoice">
+    <b>Backend path</b>
+    <div class="backendBtns">
+      <button class="backendBtn ${active==='mac-edge'?'active':''}" data-act="backend" data-backend="mac-edge">
+        <strong>Mac edge</strong><span>live · verifier gated</span>
+      </button>
+      <button class="backendBtn ${active==='browser-gpu'?'active':''}" data-act="backend" data-backend="browser-gpu">
+        <strong>Browser GPU</strong><span>${esc(gpuState)}</span>
+      </button>
+    </div>
+    <div class="mono" style="font-size:9px;line-height:1.35;color:#736c5d;margin-top:8px">${esc(note)}</div>
+    ${S.backendNote?`<div class="mono" style="font-size:9px;line-height:1.35;color:var(--amber);margin-top:6px">${esc(S.backendNote)}</div>`:''}
+  </div>`;
+}
+
 // ---------- screens ----------
 const screens = {
  capturing(){ setDark(false);
@@ -242,6 +272,7 @@ const screens = {
      <div class="lessonBox"><b>Input</b><span>voice or typed session note</span></div>
      <div class="lessonBox good"><b>Boundary</b><span>raw PHI cannot egress</span></div>
    </div>
+   ${backendHtml()}
    ${capabilityHtml()}
    <textarea id="noteInput" class="note" style="margin-top:10px" placeholder="Session note appears here…" oninput="handleNoteInput(this.value)">${esc(S.note)}</textarea>
    <div class="noteMeta">
@@ -285,6 +316,7 @@ const screens = {
      <span class="statusDot" style="color:#9bd9b3;border-color:#2c4a38;background:rgba(54,194,129,.08)">local</span>
    </div>
    <div class="stateBrief"><b>Output candidate</b><span>This is still inside the edge boundary. It becomes eligible for egress only after residual identifiers are zero.</span></div>
+   ${r.backend_note?`<div class="stateBrief"><b>Backend truth</b><span>${esc(r.backend_note)}</span></div>`:''}
    <div class="dbox" style="flex:1;margin-top:15px;padding:16px;overflow:auto;font:400 14px/1.9 var(--sans);color:#cfc7b6">${esc(r.scrubbed_text)}</div>
    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">
      ${ents.slice(0,6).map(e=>`<span style="font:700 9px var(--mono);color:#f3927f;background:rgba(191,59,43,.16);border:1px solid #5c2e27;border-radius:5px;padding:4px 7px">${esc(e)}</span>`).join('')}</div>
@@ -331,6 +363,7 @@ const screens = {
      <div style="font:700 17px var(--sans);letter-spacing:-.01em">Care record</div>
      <span class="pill" style="color:var(--green);background:#e6f0e7;border:1px solid #bfdcc6">✓ CLEAN</span></div>
    <div class="stateBrief"><b>Structured output</b><span>This is the first artifact allowed to leave the edge: pseudonymized, schema-shaped, and gate-clean.</span></div>
+   ${S.result.backend_note?`<div class="stateBrief"><b>Backend truth</b><span>${esc(S.result.backend_note)}</span></div>`:''}
    <div style="flex:1;min-height:0;margin-top:14px;background:var(--card);border:1.5px solid var(--line);border-radius:18px;padding:16px;overflow:auto">
      <div class="mono" style="font-size:10px;color:#a39a86;letter-spacing:.05em">CLIENT_PSEUDONYM</div>
      <div class="mono" style="font:700 19px var(--mono);margin-top:6px">${esc(rec.client_pseudonym||'CLIENT-—')}</div>
@@ -482,7 +515,9 @@ function saveDraft(){
       sendNote:S.sendNote,
       sendQueued:S.sendQueued,
       trajectoryCount:S.trajectoryCount,
-      trajectoryNote:S.trajectoryNote
+      trajectoryNote:S.trajectoryNote,
+      backend:S.backend,
+      backendNote:S.backendNote
     }));
   }catch(_){}
 }
@@ -499,6 +534,8 @@ function loadDraft(){
     S.sendQueued=!!d.sendQueued;
     S.trajectoryCount=d.trajectoryCount||0;
     S.trajectoryNote=d.trajectoryNote||'';
+    S.backend=d.backend||'mac-edge';
+    S.backendNote=d.backendNote||'';
   }catch(_){}
 }
 
@@ -636,6 +673,7 @@ function render(){
 
 async function onAct(e){
   const act = e.currentTarget.getAttribute('data-act');
+  if(act==='backend') return selectBackend(e.currentTarget.getAttribute('data-backend'));
   if(act==='dictate') return toggleDictation();
   if(act==='sample'){ S.note=NOTE; S.speechMsg='sample loaded'; saveDraft(); return render(); }
   if(act==='scrub'){
@@ -652,6 +690,13 @@ async function onAct(e){
   if(act==='pack'){ go('pack'); return doPackReveal(); }
   if(act==='packRetry'){ S.packDemo=null; S.packError=null; go('pack'); return doPackReveal(); }
   if(act==='backRecord') return go('delivered');
+}
+
+function selectBackend(name){
+  S.backend = name === 'browser-gpu' ? 'browser-gpu' : 'mac-edge';
+  S.backendNote = '';
+  saveDraft();
+  render();
 }
 
 function noteInput(){
@@ -733,14 +778,25 @@ function toggleDictation(){
 
 async function doScrub(){
   S.result=null; S.error=null;
-  setJob('scrub','running','rules union Bonsai');
+  if(S.backend === 'browser-gpu'){
+    S.backendNote = 'Browser GPU selected: local browser model adapter is not wired yet, so this run falls back to Mac-edge Bonsai and the same verifier gate.';
+    setJob('scrub','running','browser GPU gap recorded · falling back to Mac edge');
+  } else {
+    S.backendNote = '';
+    setJob('scrub','running','rules union Bonsai');
+  }
   if(S.screen==='scrubbing') render();          // show the loading state immediately
   try{
-    const res = await fetch('/api/scrub',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:S.note})});
+    const res = await fetch('/api/scrub',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:S.note, backend:S.backend})});
     const data = await res.json().catch(()=>({error:'the scrubber returned '+res.status}));
     if(!res.ok || data.error) throw new Error(data.error || ('the scrubber returned '+res.status));
+    data.backend = S.backend;
+    data.backend_note = S.backendNote;
     S.result = data;
-    setJob('scrub','complete',`${(data.redactions||[]).length} identifiers caught`);
+    const detail = S.backend === 'browser-gpu'
+      ? `${(data.redactions||[]).length} identifiers caught · Mac-edge fallback`
+      : `${(data.redactions||[]).length} identifiers caught`;
+    setJob('scrub','complete',detail);
   }catch(err){
     S.error = (err && err.message) || 'could not reach the scrubber';
     setJob('scrub','failed',S.error);

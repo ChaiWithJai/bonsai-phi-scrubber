@@ -60,6 +60,7 @@ What we now have:
 - A local verifier-gated Rust core.
 - A browser capability endpoint: `POST /api/client-capability`.
 - A phone-visible capability panel in the demo UI.
+- A selectable web backend path: `Mac edge` or `Browser GPU`.
 - A validated external Bonsai WebGPU demo:
   <https://huggingface.co/spaces/webml-community/bonsai-webgpu>.
 - Documentation that the HF demo uses `onnx-community/Bonsai-1.7B-ONNX` through
@@ -67,7 +68,9 @@ What we now have:
 
 What we do not have yet:
 
-- Local browser inference inside our web shell.
+- Local browser inference inside our web shell. The UI can select `Browser GPU`,
+  but it honestly records the gap and falls back to Mac-edge Bonsai until the
+  adapter is wired.
 - A structured span contract running in browser GPU.
 - Offline model caching proof.
 - A measured phone-local scrub on our synthetic coaching note.
@@ -137,6 +140,9 @@ Implemented:
 - `POST /api/client-capability`
 - `/api/status` now includes `client_capability`
 - phone UI shows a Browser inference probe card
+- phone UI can select `Mac edge` or `Browser GPU`
+- selecting `Browser GPU` currently fails closed to Mac-edge Bonsai and displays
+  that truth in the scrub/record states
 - UI links to the HF Bonsai WebGPU Space
 
 Note: local LAN HTTP may not be a secure context on iPhone Safari. A phone can
@@ -157,6 +163,15 @@ calls:
 | `/api/send` | 0.26s, Slack accepted |
 | `/api/trajectory` | 0.03s, gate-clean trajectory stored |
 | `./run.sh slack-smoke` | accepted through app-originated gated send |
+
+After adding the selectable `Browser GPU` backend, the current honest fallback
+path was profiled again:
+
+| Step | Result |
+| --- | --- |
+| `/api/scrub` with `backend: browser-gpu` | 13.60s, falls back to Mac-edge Bonsai, `gate_pass: true`, `residual_count: 0`, 4 redactions |
+| `/api/send` | 0.27s, Slack accepted |
+| `/api/trajectory` | 0.03s, gate-clean trajectory stored as `local-000006` |
 
 The scrub result caught:
 
@@ -189,15 +204,16 @@ and has the verifier gate.
 
 Do not break it while building browser GPU.
 
-### Step 2: Add Browser GPU As A Selectable Backend
+### Step 2: Replace Browser GPU Fallback With A Real Adapter
 
-Add a new web backend mode:
+The selectable backend exists:
 
 ```text
 Backend: Mac edge | Browser GPU spike
 ```
 
-The browser GPU mode should:
+The next build slice is to replace the honest fallback with a real browser
+adapter. Browser GPU mode should:
 
 - load the Bonsai ONNX/WebGPU model in the browser;
 - return raw span JSON proposals;
