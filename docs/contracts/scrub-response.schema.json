@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ChaiWithJai/airplane-mode/docs/contracts/scrub-response.schema.json",
+  "title": "Airplane Mode Scrub Response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scrubbed_text",
+    "redactions",
+    "gate_pass",
+    "residual_count",
+    "record"
+  ],
+  "properties": {
+    "scrubbed_text": {
+      "type": "string",
+      "description": "The scrubbed note candidate. It may leave only when gate_pass is true."
+    },
+    "redactions": {
+      "type": "array",
+      "description": "Entity/layer summaries only. Raw matched text stays local with the redaction map.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["entity", "layer"],
+        "properties": {
+          "entity": { "type": "string" },
+          "layer": { "type": "string" }
+        }
+      }
+    },
+    "gate_pass": {
+      "type": "boolean"
+    },
+    "residual_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "client_pseudonym",
+        "themes",
+        "commitments",
+        "follow_ups",
+        "risk_flags",
+        "autonomy_delta",
+        "next_touch"
+      ],
+      "properties": {
+        "client_pseudonym": { "type": "string" },
+        "themes": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "commitments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["text", "status"],
+            "properties": {
+              "text": { "type": "string" },
+              "status": { "type": "string" }
+            }
+          }
+        },
+        "follow_ups": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "risk_flags": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "autonomy_delta": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["logged", "signals", "direction"],
+          "properties": {
+            "logged": { "type": "boolean" },
+            "signals": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "direction": { "type": "string" }
+          }
+        },
+        "next_touch": { "type": "string" }
+      }
+    }
+  }
+}

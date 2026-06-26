@@ -14,6 +14,7 @@ M3 hardware proof.
   - `Edge HTTP mock`: simulator stand-in for the laptop `/api/scrub` JSON contract.
 - Both mocks return the same backend-shaped DTOs as the web shell uses conceptually:
   `scrubbed_text`, `redactions`, `gate_pass`, `residual_count`, and a scrubbed `record`.
+  The shared contract fixture is `../../docs/contracts/scrub-response.sample.json`.
 - The UI keeps egress blocked until a simulated verifier reports zero residual identifiers.
 - Raw synthetic input and the redaction map stay behind a simulator-only store API; only count
   metadata and the scrubbed record are surfaced.

@@ -345,6 +345,7 @@ real iPhone 11 hardware proof.
 | `shells/mcp/` | Agent-callable interface over the same core. |
 | `packs/coach-session/` | Reference pack and synthetic eval set. |
 | `docs/model-setup.md` | Model download/runtime details. |
+| `docs/contracts/` | Shared JSON contract fixtures for shell/backend interoperability. |
 | `docs/demo/onboarding.md` | Phone demo and Slack runbook. |
 | `docs/extending.md` | Pack extension walkthrough. |
 | `docs/demo/how-the-demo-works.md` | Architecture, topology, workload profile, worked examples. |

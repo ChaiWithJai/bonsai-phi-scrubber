@@ -97,3 +97,28 @@ import Foundation
     #expect(record["autonomy_delta"] != nil)
     #expect(record["next_touch"] as? String == "scheduled")
 }
+
+@Test func backendDTOsDecodeSharedScrubResponseFixture() throws {
+    let fixture = try readRepoFixture("docs/contracts/scrub-response.sample.json")
+    let response = try JSONDecoder().decode(BackendScrubResponse.self, from: fixture)
+
+    #expect(response.gatePass)
+    #expect(response.residualCount == 0)
+    #expect(response.redactions.map(\.entity).contains("MEMBER_ID"))
+    #expect(response.record.clientPseudonym == "client ready circle")
+    #expect(response.record.autonomyDelta.signals == ["self_initiated", "commitment_completed"])
+}
+
+private func readRepoFixture(_ relativePath: String) throws -> Data {
+    let fm = FileManager.default
+    var dir = URL(fileURLWithPath: fm.currentDirectoryPath, isDirectory: true)
+    for _ in 0..<8 {
+        let candidate = dir.appendingPathComponent(relativePath)
+        if fm.fileExists(atPath: candidate.path) {
+            return try Data(contentsOf: candidate)
+        }
+        dir.deleteLastPathComponent()
+    }
+    Issue.record("Missing fixture \(relativePath) from \(fm.currentDirectoryPath)")
+    return Data()
+}

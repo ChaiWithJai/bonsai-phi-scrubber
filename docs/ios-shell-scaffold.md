@@ -27,7 +27,9 @@ not prove the privacy claim.
 
 Both produce the same transport-shaped response fields: `scrubbed_text`, `redactions`,
 `gate_pass`, `residual_count`, and `record`. This keeps the Swift UI interoperable with
-the backend contract while making clear that no real model has run in Simulator.
+the backend contract while making clear that no real model has run in Simulator. The
+schema and sample fixture live under `docs/contracts/`; Swift tests decode the shared
+fixture through the simulator DTOs.
 
 ## What Simulator Cannot Prove
 

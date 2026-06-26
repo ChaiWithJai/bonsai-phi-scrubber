@@ -1,0 +1,28 @@
+{
+  "scrubbed_text": "Met with [PERSON] ([MEMBER_ID]) at her place [DATE]. She's the one whose [FAMILY_DETAIL]. Committed to a 10-min morning walk daily.",
+  "redactions": [
+    { "entity": "PERSON", "layer": "mlx-swift-mock" },
+    { "entity": "MEMBER_ID", "layer": "mlx-swift-mock" },
+    { "entity": "DATE", "layer": "mlx-swift-mock" },
+    { "entity": "FAMILY_DETAIL", "layer": "mlx-swift-mock" }
+  ],
+  "gate_pass": true,
+  "residual_count": 0,
+  "record": {
+    "client_pseudonym": "client ready circle",
+    "themes": ["routine building", "daily movement"],
+    "commitments": [
+      { "text": "10-min morning walk daily", "status": "open" }
+    ],
+    "follow_ups": [
+      "Before the next touch, try this once on your own: 10-min morning walk daily."
+    ],
+    "risk_flags": [],
+    "autonomy_delta": {
+      "logged": true,
+      "signals": ["self_initiated", "commitment_completed"],
+      "direction": "client_led"
+    },
+    "next_touch": "scheduled"
+  }
+}
