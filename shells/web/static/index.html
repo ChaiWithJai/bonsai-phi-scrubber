@@ -223,11 +223,12 @@ const DEFAULT_BACKEND = '';
 const RUNTIME_CHOICE_VERSION = 2;
 const SCRUB_BROWSER_LOAD_TIMEOUT_MS = 15000;
 const SCRUB_BROWSER_GENERATE_TIMEOUT_MS = 20000;
-const S = { screen:'capturing', note:'', result:null, error:null, posted:false, sendNote:'', sendQueued:false, trajectoryCount:0, trajectoryNote:'', packDemo:null, packError:null, listening:false, speechMsg:'', status:null, job:null, capability:null, backend:DEFAULT_BACKEND, backendNote:'', browserModel:{status:'idle',detail:'not loaded',model:'onnx-community/Bonsai-1.7B-ONNX',elapsed_ms:0,tokens:0,tps:0,output_preview:''} };
+const S = { screen:'capturing', note:'', result:null, error:null, posted:false, sendNote:'', sendQueued:false, trajectoryCount:0, trajectoryNote:'', packDemo:null, packError:null, listening:false, speechMsg:'', status:null, job:null, capability:null, backend:DEFAULT_BACKEND, backendNote:'', scrubStartedAt:0, scrubPhase:'', scrubEstimate:'', browserModel:{status:'idle',detail:'not loaded',model:'onnx-community/Bonsai-1.7B-ONNX',elapsed_ms:0,tokens:0,tps:0,output_preview:''} };
 let recognizer = null;
 let browserWorker = null;
 let browserWorkerPending = null;
 let browserModelReady = false;
+let scrubHeartbeatTimer = null;
 
 const $phone = document.getElementById('phone');
 const $screen = document.getElementById('screen');
@@ -414,17 +415,25 @@ const screens = {
      <span data-act="back" class="mono" style="font-size:12px;color:#8c8475;text-align:center;cursor:pointer">← back to the note</span>`; }
    const r = S.result;
    // loading state — the REAL note, under the sweep
-   if(!r){ return `
+   if(!r){
+     const elapsed = scrubElapsedSeconds();
+     const phase = S.scrubPhase || 'starting local scrub';
+     const estimate = S.scrubEstimate || 'short notes usually take 15-30s; longer notes can take 30-60s';
+     const why = S.backend === 'browser-gpu'
+       ? 'Browser GPU gets a short phone-local attempt first; Mac-edge fallback then runs the verifier pipeline.'
+       : 'Mac-edge runs 5 seeded identifier passes plus 1 clean-record structuring call.';
+     return `
      ${flowHtml('scrubbing')}
      <div class="stepTitle" style="margin-top:13px">
        <div><div class="mono" style="font-size:10px;color:#7e8a80;letter-spacing:.08em">STEP 2</div><h1 style="color:#f3eee2">Scrub locally</h1></div>
        <span class="statusDot" style="color:#9bd9b3;border-color:#2c4a38;background:rgba(54,194,129,.08)">on-device</span>
      </div>
-     <div class="stateBrief"><b>Active workload</b><span>Rules and Bonsai produce structured JSON; nothing can be sent until the verifier gate re-scans it.</span></div>
+     <div class="stateBrief"><b>${esc(phase)}</b><span>${esc(estimate)}. Local means the data stays inside the first-party edge boundary; the model work still takes time.</span></div>
      <div class="dbox" style="position:relative;flex:1;margin-top:15px;padding:16px;overflow:hidden;font:400 14px/1.8 var(--sans);color:#6f685b">
        <div class="swband"></div>${esc(S.note)}</div>
-     <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;border-top:1px solid #2a2620;padding-top:14px">
-       <span class="mono" style="font-size:11px;color:#8c8475">running locally · a few seconds</span>
+     <div style="margin-top:13px;color:#8c8475;font:400 12px/1.5 var(--sans)">${esc(why)}</div>
+     <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;border-top:1px solid #2a2620;padding-top:14px">
+       <span class="mono" style="font-size:11px;color:#8c8475">elapsed ${elapsed}s</span>
        <span class="mono" style="font-size:11px;color:#d09a3a;display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:50%;background:#d09a3a;animation:blink 1s infinite"></span>working</span></div>`; }
    // result — the REAL scrubbed text + the categories caught
    const ents=[...new Set(r.redactions.map(x=>x.entity))];
@@ -696,6 +705,31 @@ function setJob(kind,status,detail){
 
 function clearJobSoon(){
   setTimeout(()=>{ if(S.job && S.job.status!=='running' && S.job.status!=='retrying'){ S.job=null; render(); } }, 2600);
+}
+
+function startScrubHeartbeat(phase, estimate){
+  S.scrubStartedAt = Date.now();
+  S.scrubPhase = phase;
+  S.scrubEstimate = estimate;
+  if(scrubHeartbeatTimer) clearInterval(scrubHeartbeatTimer);
+  scrubHeartbeatTimer = setInterval(()=>{
+    if(S.screen === 'scrubbing' && !S.result && !S.error) render();
+  }, 1000);
+}
+
+function updateScrubHeartbeat(phase, estimate){
+  S.scrubPhase = phase || S.scrubPhase;
+  S.scrubEstimate = estimate || S.scrubEstimate;
+  if(S.screen === 'scrubbing' && !S.result && !S.error) render();
+}
+
+function stopScrubHeartbeat(){
+  if(scrubHeartbeatTimer) clearInterval(scrubHeartbeatTimer);
+  scrubHeartbeatTimer = null;
+}
+
+function scrubElapsedSeconds(){
+  return S.scrubStartedAt ? Math.max(0, Math.round((Date.now() - S.scrubStartedAt) / 1000)) : 0;
 }
 
 function jobHtml(){
@@ -1112,6 +1146,7 @@ async function doScrub(){
       return;
     }
     S.backendNote = 'Browser GPU selected: attempting local Bonsai q1 span generation. Demo guardrail: if phone-local load is not ready quickly, Mac-edge Bonsai takes over.';
+    startScrubHeartbeat('Browser GPU warmup', 'phone-local attempt has a 15s load budget and 20s generation budget');
     setJob('scrub','running','browser GPU span probe');
     const probe = await runBrowserGpuSpanProbe(S.note, {
       loadTimeoutMs: SCRUB_BROWSER_LOAD_TIMEOUT_MS,
@@ -1119,12 +1154,14 @@ async function doScrub(){
     });
     if(probe.ok){
       S.backendNote = `Browser GPU produced local span candidates in ${(probe.elapsed_ms/1000).toFixed(1)}s; finalizing through the verifier gate.`;
+      updateScrubHeartbeat('Verifier finalizing browser spans', 'usually a few seconds after phone-local spans return');
       setJob('scrub','running','verifying browser spans');
       const finalized = await finalizeBrowserSpans(S.note, probe.output);
       if(finalized.ok){
         S.result = finalized.data;
         S.backendNote = finalized.data.backend_note || 'Browser GPU spans accepted by verifier gate.';
         setJob('scrub','complete',`${(finalized.data.redactions||[]).length} identifiers caught · browser spans accepted`);
+        stopScrubHeartbeat();
         saveDraft();
         clearJobSoon();
         if(S.screen==='scrubbing') render();
@@ -1134,11 +1171,14 @@ async function doScrub(){
     } else {
       S.backendNote = `Browser GPU probe did not complete within the demo budget (${probe.detail}); falling back to Mac-edge Bonsai and verifier.`;
     }
+    updateScrubHeartbeat('Mac-edge fallback verifier', 'short notes usually take 15-30s; longer notes can take 30-60s');
     setJob('scrub','running','Mac-edge verifier fallback');
   } else {
     S.backendNote = '';
+    startScrubHeartbeat('Mac-edge Bonsai scrub', 'short notes usually take 15-30s; longer notes can take 30-60s');
     setJob('scrub','running','rules union Bonsai');
   }
+  updateScrubHeartbeat('Mac-edge Bonsai: 5 seeded passes + structuring', 'short notes usually take 15-30s; longer notes can take 30-60s');
   if(S.screen==='scrubbing') render();          // show the loading state immediately
   try{
     const res = await fetch('/api/scrub',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:S.note, backend:S.backend})});
@@ -1155,6 +1195,7 @@ async function doScrub(){
     S.error = (err && err.message) || 'could not reach the scrubber';
     setJob('scrub','failed',S.error);
   }
+  stopScrubHeartbeat();
   saveDraft();
   clearJobSoon();
   if(S.screen==='scrubbing') render();
