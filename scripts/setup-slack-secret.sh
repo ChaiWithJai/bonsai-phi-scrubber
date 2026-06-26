@@ -59,7 +59,7 @@ security add-generic-password -U -a "$USER" -s "$service" -w "$secret" >/dev/nul
 echo "Stored Slack credential in Keychain service: $service"
 
 if [ "$mode" = "bot-token" ]; then
-  echo "Restart with: SLACK_CHANNEL='$channel' AIRPLANE_WEB_ADDR=127.0.0.1:8099 ./run.sh web"
+  echo "Restart with: SLACK_CHANNEL='$channel' AIRPLANE_WEB_ADDR=0.0.0.0:8099 ./run.sh web"
 else
-  echo "Restart with: AIRPLANE_WEB_ADDR=127.0.0.1:8099 ./run.sh web"
+  echo "Restart with: AIRPLANE_WEB_ADDR=0.0.0.0:8099 ./run.sh web"
 fi

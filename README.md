@@ -43,10 +43,10 @@ You should see **rules ∪ Bonsai-1.7B → 100% recall / 0 leakage** on the 21-n
 
 ```bash
 ./scripts/serve-model.sh    # the model (terminal 1)
-./run.sh web                # the UI (terminal 2) — prints a LAN URL
+AIRPLANE_WEB_ADDR=0.0.0.0:8099 ./run.sh web   # the UI (terminal 2) — prints a LAN URL
 ```
 
-Open the printed `http://<laptop-ip>:8088` on a phone on the same Wi-Fi (or your iPhone hotspot — see the runbook). Dictate → **Scrub on device** → the name/ID/date/relationship get caught → the gate clears → the de-identified card **posts to Slack**. The full runbook, the Wi-Fi-isolation fix, and the 2-minute Slack-webhook setup are in **[docs/demo/onboarding.md](docs/demo/onboarding.md)**.
+Open the printed `http://<laptop-ip>:8099` on a phone on the same Wi-Fi (or your iPhone hotspot — see the runbook). Dictate → **Scrub on device** → the name/ID/date/relationship get caught → the gate clears → the de-identified card **posts to Slack**. The full runbook, the Wi-Fi-isolation fix, and the 2-minute Slack-webhook setup are in **[docs/demo/onboarding.md](docs/demo/onboarding.md)**.
 
 ---
 

@@ -23,7 +23,7 @@ You need **both** running at the same time, in two terminals.
    ```sh
    ./run.sh web
    ```
-   This builds + runs the web shell, binds `0.0.0.0:8088`, and prints `http://localhost:8088` plus any LAN URLs.
+   This builds + runs the web shell, binds `0.0.0.0:8099`, and prints `http://localhost:8099` plus any LAN URLs.
 
 ### Pre-checks (run on the Mac)
 
@@ -96,11 +96,11 @@ By default the record shows as a **preview**. To make it actually land in a Slac
 3. Store the URL in Keychain:
    ```bash
    scripts/setup-slack-secret.sh webhook
-   AIRPLANE_WEB_ADDR=127.0.0.1:8099 ./run.sh web
+   AIRPLANE_WEB_ADDR=0.0.0.0:8099 ./run.sh web
    ```
    Or restart the web server with the URL in the environment:
    ```bash
-   SLACK_WEBHOOK_URL='https://hooks.slack.com/services/XXX/YYY/ZZZ' AIRPLANE_WEB_ADDR=127.0.0.1:8099 ./run.sh web
+   SLACK_WEBHOOK_URL='https://hooks.slack.com/services/XXX/YYY/ZZZ' AIRPLANE_WEB_ADDR=0.0.0.0:8099 ./run.sh web
    ```
    On startup it prints `slack: webhook configured — records post for real`.
 4. Run the demo. When the queue flushes, the **de-identified record posts to that Slack channel for real** — no name, no member ID. Open Slack on the big screen and evaluate it.
@@ -113,12 +113,12 @@ Use this when you want the channel to come from `packs/coach-session/sink.yaml` 
 2. Install it into the workspace and copy the bot token (`xoxb-...`).
 3. Either pass it in the environment:
    ```bash
-   SLACK_BOT_TOKEN='xoxb-...' SLACK_CHANNEL='#coach-records' AIRPLANE_WEB_ADDR=127.0.0.1:8099 ./run.sh web
+   SLACK_BOT_TOKEN='xoxb-...' SLACK_CHANNEL='#coach-records' AIRPLANE_WEB_ADDR=0.0.0.0:8099 ./run.sh web
    ```
    Or put it in Keychain under the pack's configured ref:
    ```bash
    scripts/setup-slack-secret.sh bot-token '#coach-records'
-   AIRPLANE_WEB_ADDR=127.0.0.1:8099 ./run.sh web
+   AIRPLANE_WEB_ADDR=0.0.0.0:8099 ./run.sh web
    ```
    If `SLACK_CHANNEL` is absent, the sink routes to `channelMap.default` in `sink.yaml`.
 4. On startup it prints `slack: SLACK_BOT_TOKEN set — records post to #coach-records`.
@@ -128,7 +128,7 @@ The Slack endpoint re-runs the verifier gate over the outgoing de-identified rec
 Preflight the current sink before the demo:
 
 ```bash
-curl http://localhost:8088/api/status | jq .
+curl http://localhost:8099/api/status | jq .
 ```
 
 Expect `.model.reachable == true` before scrubbing. Expect `.slack.configured == true` and route `webhook` or `bot_token` for a real Slack post. If the Slack route is `preview`, the UI will still run but the clean card will not leave the app.
