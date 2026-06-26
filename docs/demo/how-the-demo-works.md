@@ -137,6 +137,75 @@ rejects:
 - `usedSignals: [engagement]`
 - `escalationRequired: false`
 
+For iteration work that does not touch recall or leakage, use the fast lane:
+
+```bash
+./run.sh gates-fast
+```
+
+`gates-fast` runs the structural, policy, provenance, manifest, and negative
+ethical fixture checks without making model calls. It is the right guard while
+changing docs, Slack wiring, UI copy, or network setup. It is not a release
+substitute for `./run.sh gates`, because it intentionally skips the 21-note
+recall/leakage eval.
+
+### Why full eval can take hours
+
+The full eval is deliberately expensive: `21` synthetic notes x `5` seeded
+passes = `105` serial Bonsai requests over `127.0.0.1:8080`. That is where the
+time goes. The Rust rules, verifier, pack loading, and Slack fixtures are small;
+model inference dominates.
+
+The CLI now prints the eval plan, per-note timing, and total runtime before it
+compares against `eval/golden-run.txt`. Model requests are bounded with
+`AIRPLANE_MODEL_TIMEOUT_SECS` (default `120` seconds) so a dead local server
+fails instead of blocking forever:
+
+```bash
+AIRPLANE_MODEL_TIMEOUT_SECS=120 ./run.sh gates
+```
+
+For a quick model-health smoke during development, run a reduced-pass eval
+explicitly and do not treat it as the release bar:
+
+```bash
+AIRPLANE_EVAL_PASSES=1 ./run.sh eval
+```
+
+Slack egress in the web shell is also bounded with `AIRPLANE_SLACK_TIMEOUT_SECS`
+(default `15` seconds). A failed Slack send does not append a trajectory.
+
+### Mobile "Not Posted" State
+
+The phone reaches **Not posted** through this state path:
+
+```text
+ready -> flush -> POST /api/send -> no ok:true response -> delivered(posted=false)
+```
+
+That state means the system did not receive a confirmed Slack acknowledgement.
+The local trajectory store is skipped. The raw note still does not leave through
+Slack because `/api/send` re-runs the verifier over the exact outbound Slack
+text before using credentials.
+
+There are three different failure classes:
+
+- `Slack gate blocked residual identifiers`: the edge received the send request
+  and refused egress before Slack.
+- `Slack webhook/bot post failed...`: the edge received the request and Slack
+  rejected or timed out.
+- `phone lost connection to edge server...`: the phone did not complete the
+  local LAN request to `airplane-web`.
+
+The third class is where the incident was observed: on the phone UI after the
+flush animation. Local status can still be green on the Mac because the Mac can
+reach itself over `127.0.0.1`; the relevant check for the phone is the LAN URL,
+for example:
+
+```bash
+curl http://192.168.1.88:8099/api/status | jq '{slack:.slack, model:.model}'
+```
+
 ## Worked Example 1: Sample Note to Slack
 
 Input note:

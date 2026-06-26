@@ -15,6 +15,7 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 const DEFAULT_PACK_DIR: &str = "packs/coach-session";
 const INDEX: &str = "shells/web/static/index.html";
@@ -54,12 +55,14 @@ fn trajectory_store_path() -> PathBuf {
 struct LlamaServer {
     url: String,
     model: String,
+    timeout: Duration,
 }
 impl Default for LlamaServer {
     fn default() -> Self {
         Self {
             url: "http://127.0.0.1:8080/v1/chat/completions".into(),
             model: "ternary-bonsai-1.7b".into(),
+            timeout: model_timeout(),
         }
     }
 }
@@ -72,8 +75,13 @@ impl LlamaServer {
             "top_p": sampling.top_p, "max_tokens": sampling.max_tokens, "seed": sampling.seed,
             "response_format": {"type":"json_schema","json_schema":{"name":"out","strict":true,"schema":schema}}
         });
-        let resp = ureq::post(&self.url).send_json(body).map_err(|e| {
-            anyhow::anyhow!("llama-server failed ({e}); run ./scripts/serve-model.sh")
+        let started = Instant::now();
+        let agent = ureq::AgentBuilder::new().timeout(self.timeout).build();
+        let resp = agent.post(&self.url).send_json(body).map_err(|e| {
+            anyhow::anyhow!(
+                "llama-server failed after {:.1}s ({e}); run ./scripts/serve-model.sh",
+                started.elapsed().as_secs_f32()
+            )
         })?;
         let v: Value = resp.into_json().context("parse llama-server response")?;
         Ok(v["choices"][0]["message"]["content"]
@@ -81,6 +89,23 @@ impl LlamaServer {
             .unwrap_or("")
             .to_string())
     }
+}
+
+fn env_timeout_secs(name: &str, default_secs: u64) -> Duration {
+    let secs = std::env::var(name)
+        .ok()
+        .and_then(|s| s.parse::<u64>().ok())
+        .filter(|s| *s > 0)
+        .unwrap_or(default_secs);
+    Duration::from_secs(secs)
+}
+
+fn model_timeout() -> Duration {
+    env_timeout_secs("AIRPLANE_MODEL_TIMEOUT_SECS", 120)
+}
+
+fn slack_timeout() -> Duration {
+    env_timeout_secs("AIRPLANE_SLACK_TIMEOUT_SECS", 15)
 }
 impl InferenceProvider for LlamaServer {
     fn complete(&self, req: &InferenceRequest<'_>) -> Result<String> {
@@ -532,11 +557,16 @@ fn slack_outbound_text(record: &Value) -> String {
 fn slack_post(record: &Value) -> Result<()> {
     let config = load_sink_config()?;
     let blocks = slack_blocks(record);
+    let agent = ureq::AgentBuilder::new().timeout(slack_timeout()).build();
     if let Some(webhook) = slack_webhook_url() {
         let payload = json!({ "blocks": blocks });
-        ureq::post(&webhook)
-            .send_json(payload)
-            .map_err(|e| anyhow::anyhow!("Slack webhook post failed: {e}"))?;
+        let started = Instant::now();
+        agent.post(&webhook).send_json(payload).map_err(|e| {
+            anyhow::anyhow!(
+                "Slack webhook post failed after {:.1}s: {e}",
+                started.elapsed().as_secs_f32()
+            )
+        })?;
         return Ok(());
     }
 
@@ -550,11 +580,18 @@ fn slack_post(record: &Value) -> Result<()> {
         "channel": channel,
         "blocks": blocks
     });
-    let resp = ureq::post("https://slack.com/api/chat.postMessage")
+    let started = Instant::now();
+    let resp = agent
+        .post("https://slack.com/api/chat.postMessage")
         .set("Authorization", &format!("Bearer {token}"))
         .set("Content-Type", "application/json; charset=utf-8")
         .send_json(payload)
-        .map_err(|e| anyhow::anyhow!("Slack bot post failed: {e}"))?;
+        .map_err(|e| {
+            anyhow::anyhow!(
+                "Slack bot post failed after {:.1}s: {e}",
+                started.elapsed().as_secs_f32()
+            )
+        })?;
     let body: Value = resp.into_json().context("parse Slack response")?;
     if body["ok"].as_bool() != Some(true) {
         anyhow::bail!(
@@ -566,6 +603,7 @@ fn slack_post(record: &Value) -> Result<()> {
 }
 
 fn handle_send(body: &str) -> Value {
+    let started = Instant::now();
     let input: Value = match serde_json::from_str(body) {
         Ok(v) => v,
         Err(e) => return json!({"ok": false, "error": format!("parse request body: {e}")}),
@@ -579,6 +617,11 @@ fn handle_send(body: &str) -> Value {
         Err(e) => return json!({"ok": false, "error": format!("{e:#}")}),
     };
     if let GateDecision::Block { residual } = VerifierGate::new(&pack.rules).check(&text) {
+        eprintln!(
+            "send: blocked before Slack residual_count={} elapsed={:.1}s",
+            residual.len(),
+            started.elapsed().as_secs_f32()
+        );
         return json!({
             "ok": false,
             "error": "Slack gate blocked residual identifiers",
@@ -586,8 +629,20 @@ fn handle_send(body: &str) -> Value {
         });
     }
     match slack_post(&input["record"]) {
-        Ok(()) => json!({"ok": true}),
-        Err(e) => json!({"ok": false, "error": format!("{e}")}),
+        Ok(()) => {
+            eprintln!(
+                "send: Slack accepted elapsed={:.1}s",
+                started.elapsed().as_secs_f32()
+            );
+            json!({"ok": true})
+        }
+        Err(e) => {
+            eprintln!(
+                "send: Slack failed elapsed={:.1}s error={e}",
+                started.elapsed().as_secs_f32()
+            );
+            json!({"ok": false, "error": format!("{e}")})
+        }
     }
 }
 

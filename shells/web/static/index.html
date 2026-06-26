@@ -453,7 +453,19 @@ async function doSend(){
   S.posted=false; S.sendNote=''; S.trajectoryNote='';
   // real Slack post, with a minimum dwell so the flush animation reads
   const post = fetch('/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({record:S.result.record})})
-    .then(r=>r.json()).catch(()=>({ok:false,error:'could not reach the sink'}));
+    .then(async r=>{
+      const data = await r.json().catch(()=>({ok:false,error:`edge returned non-JSON from /api/send (${r.status})`}));
+      if(!r.ok && !data.error) data.error = `edge rejected /api/send (${r.status})`;
+      return data;
+    }).catch(async ()=>{
+      const edge = await fetch('/api/health',{cache:'no-store'}).then(r=>r.ok).catch(()=>false);
+      return {
+        ok:false,
+        error: edge
+          ? 'edge is reachable, but /api/send was interrupted before Slack acknowledged'
+          : `phone lost connection to edge server at ${location.host}`
+      };
+    });
   const [data] = await Promise.all([post, new Promise(r=>setTimeout(r,1900))]);
   S.posted = !!data.ok; S.sendNote = data.ok ? '' : (data.error||'');
   if(data.ok){

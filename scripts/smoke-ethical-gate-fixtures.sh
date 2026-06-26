@@ -27,7 +27,7 @@ run_must_fail() {
   local out status
 
   set +e
-  out="$(PACK="$pack" "$bin" gates 2>&1)"
+  out="$(PACK="$pack" "$bin" gates-fast 2>&1)"
   status=$?
   set -e
 

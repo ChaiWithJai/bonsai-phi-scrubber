@@ -6,12 +6,14 @@
 //!   airplane eval --update   refresh eval/golden-run.txt intentionally
 //!   airplane scrub "<text>"  scrub arbitrary text on the CLI
 //!   airplane gates           run the M1 harness gates (pack-blindness, recall, leakage)
+//!   airplane gates-fast      run no-model gates for fast iteration
 
 use airplane_core::{
     finalize, scrub, Expected, InferenceProvider, InferenceRequest, Pack, Sampling, Score,
 };
 use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 const DEFAULT_PACK_DIR: &str = "packs/coach-session";
 const GOLDEN_RUN: &str = "eval/golden-run.txt";
@@ -47,6 +49,7 @@ fn is_default_pack(path: &Path) -> bool {
 struct LlamaServer {
     url: String,
     model: String,
+    timeout: Duration,
 }
 
 impl Default for LlamaServer {
@@ -54,6 +57,7 @@ impl Default for LlamaServer {
         Self {
             url: "http://127.0.0.1:8080/v1/chat/completions".to_string(),
             model: "ternary-bonsai-1.7b".to_string(),
+            timeout: model_timeout(),
         }
     }
 }
@@ -78,9 +82,12 @@ impl InferenceProvider for LlamaServer {
                 "json_schema": { "name": "redactions", "strict": true, "schema": req.json_schema }
             }
         });
-        let resp = ureq::post(&self.url).send_json(body).map_err(|e| {
+        let started = Instant::now();
+        let agent = ureq::AgentBuilder::new().timeout(self.timeout).build();
+        let resp = agent.post(&self.url).send_json(body).map_err(|e| {
             anyhow::anyhow!(
-                "llama-server request failed ({e}). Is it running?  ./scripts/serve-model.sh"
+                "llama-server request failed after {:.1}s ({e}). Is it running?  ./scripts/serve-model.sh",
+                started.elapsed().as_secs_f32()
             )
         })?;
         let v: serde_json::Value = resp.into_json().context("parse llama-server response")?;
@@ -89,6 +96,15 @@ impl InferenceProvider for LlamaServer {
             .context("no message content in llama-server response")?;
         Ok(content.to_string())
     }
+}
+
+fn model_timeout() -> Duration {
+    let secs = std::env::var("AIRPLANE_MODEL_TIMEOUT_SECS")
+        .ok()
+        .and_then(|s| s.parse::<u64>().ok())
+        .filter(|s| *s > 0)
+        .unwrap_or(120);
+    Duration::from_secs(secs)
 }
 
 // ---- eval --------------------------------------------------------------------
@@ -138,8 +154,22 @@ fn run_eval(use_model: bool) -> Result<EvalOutcome> {
     let mut per_note = String::new();
     let ids = note_ids(&golden)?;
     let total_notes = ids.len();
+    let started = Instant::now();
+
+    if use_model {
+        eprintln!(
+            "eval plan: {} notes x {} passes = {} model calls (request timeout {}s)",
+            total_notes,
+            passes,
+            total_notes as u32 * passes.max(1),
+            provider.timeout.as_secs()
+        );
+    } else {
+        eprintln!("eval plan: {} notes, rules only", total_notes);
+    }
 
     for (idx, id) in ids.into_iter().enumerate() {
+        let note_started = Instant::now();
         eprintln!(
             "eval {}/{} {} ({} passes)",
             idx + 1,
@@ -163,9 +193,18 @@ fn run_eval(use_model: bool) -> Result<EvalOutcome> {
             blocked.push(id.clone());
             "BLOCK"
         };
+        eprintln!(
+            "eval {}/{} {} -> {} in {:.1}s",
+            idx + 1,
+            total_notes,
+            id,
+            gate,
+            note_started.elapsed().as_secs_f32()
+        );
         per_note.push_str(&format!("{id}  gate={gate}\n"));
     }
     finalize(&mut acc);
+    eprintln!("eval complete in {:.1}s", started.elapsed().as_secs_f32());
 
     let report = format!(
         "Airplane Mode — eval/golden-run\n\
@@ -304,10 +343,14 @@ fn cmd_scrub(text: &str) -> Result<()> {
 
 // ---- gates -------------------------------------------------------------------
 
-fn cmd_gates() -> Result<()> {
+struct PreModelGateOutcome {
+    pack: Pack,
+    failed: bool,
+}
+
+fn run_pre_model_gates() -> Result<PreModelGateOutcome> {
     let pack_dir = pack_dir();
     let mut failed = false;
-    let mut pre_model_failed = false;
 
     // pack-blindness (structural, no model)
     match Pack::validate_blindness(&pack_dir) {
@@ -315,7 +358,6 @@ fn cmd_gates() -> Result<()> {
         Err(e) => {
             println!("gate pack-blindness : FAIL — {e}");
             failed = true;
-            pre_model_failed = true;
         }
     }
 
@@ -325,7 +367,6 @@ fn cmd_gates() -> Result<()> {
         Err(e) => {
             println!("gate reward-lint    : FAIL — {e}");
             failed = true;
-            pre_model_failed = true;
         }
     }
     match pack.validate_scope_boundary() {
@@ -333,7 +374,6 @@ fn cmd_gates() -> Result<()> {
         Err(e) => {
             println!("gate scope-boundary : FAIL — {e}");
             failed = true;
-            pre_model_failed = true;
         }
     }
     match Pack::validate_signature_provenance(&pack_dir) {
@@ -341,7 +381,6 @@ fn cmd_gates() -> Result<()> {
         Err(e) => {
             println!("gate signature/prov : FAIL — {e}");
             failed = true;
-            pre_model_failed = true;
         }
     }
     match Pack::validate_manifest_revocation(Path::new("manifest.yaml"), &pack_dir) {
@@ -349,16 +388,31 @@ fn cmd_gates() -> Result<()> {
         Err(e) => {
             println!("gate manifest/revoke: FAIL — {e}");
             failed = true;
-            pre_model_failed = true;
         }
     }
 
-    if pre_model_failed {
+    Ok(PreModelGateOutcome { pack, failed })
+}
+
+fn cmd_gates_fast() -> Result<()> {
+    let out = run_pre_model_gates()?;
+    if out.failed {
+        anyhow::bail!("one or more pre-model gates failed");
+    }
+    println!("\nall fast gates PASS (model eval not run; use `./run.sh gates` for recall/leakage)");
+    Ok(())
+}
+
+fn cmd_gates() -> Result<()> {
+    let mut failed = false;
+    let pre_model = run_pre_model_gates()?;
+
+    if pre_model.failed {
         anyhow::bail!("one or more pre-model gates failed");
     }
 
     // recall + leakage (needs the model)
-    let threshold = pack.policy.deidentification.recall_threshold;
+    let threshold = pre_model.pack.policy.deidentification.recall_threshold;
     let out = run_eval(true)?;
     if out.score.recall + 1e-9 >= threshold {
         println!(
@@ -402,8 +456,9 @@ fn usage() {
            airplane eval --update   refresh eval/golden-run.txt intentionally\n\
            airplane scrub \"<text>\"  scrub arbitrary text\n\
            airplane gates           run the harness gates\n\
-         \n\
-         Needs llama-server for the model layer:  ./scripts/serve-model.sh"
+           airplane gates-fast      run no-model gates for fast iteration\n\
+           \n\
+           Needs llama-server for eval/gates model layer:  ./scripts/serve-model.sh"
     );
 }
 
@@ -419,6 +474,7 @@ fn main() {
             }
         },
         "gates" => cmd_gates(),
+        "gates-fast" => cmd_gates_fast(),
         "scrub" => match args.get(2) {
             Some(text) => cmd_scrub(text),
             None => {
