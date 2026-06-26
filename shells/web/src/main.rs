@@ -63,6 +63,14 @@ fn content_length_header(len: u64) -> tiny_http::Header {
     tiny_http::Header::from_bytes(&b"Content-Length"[..], len.to_string().as_bytes()).unwrap()
 }
 
+fn no_store_header() -> tiny_http::Header {
+    tiny_http::Header::from_bytes(
+        &b"Cache-Control"[..],
+        &b"no-store, max-age=0, must-revalidate"[..],
+    )
+    .unwrap()
+}
+
 fn accept_ranges_header() -> tiny_http::Header {
     tiny_http::Header::from_bytes(&b"Accept-Ranges"[..], &b"bytes"[..]).unwrap()
 }
@@ -1436,22 +1444,31 @@ fn main() -> Result<()> {
                 observe_browser_request(&req, "GET", "/", "app", None);
                 let html = std::fs::read_to_string(INDEX)
                     .unwrap_or_else(|_| "<h1>index.html missing</h1>".into());
-                let _ =
-                    req.respond(tiny_http::Response::from_string(html).with_header(html_header));
+                let _ = req.respond(
+                    tiny_http::Response::from_string(html)
+                        .with_header(html_header)
+                        .with_header(no_store_header()),
+                );
             }
             ("GET", "/gpu") => {
                 observe_browser_request(&req, "GET", "/gpu", "gpu-probe", None);
                 let html = std::fs::read_to_string(GPU_PROBE)
                     .unwrap_or_else(|_| "<h1>gpu.html missing</h1>".into());
-                let _ =
-                    req.respond(tiny_http::Response::from_string(html).with_header(html_header));
+                let _ = req.respond(
+                    tiny_http::Response::from_string(html)
+                        .with_header(html_header)
+                        .with_header(no_store_header()),
+                );
             }
             ("GET", "/proof" | "/p") => {
                 observe_browser_request(&req, "GET", path.as_str(), "proof", None);
                 let html = std::fs::read_to_string(PROOF)
                     .unwrap_or_else(|_| "<h1>proof.html missing</h1>".into());
-                let _ =
-                    req.respond(tiny_http::Response::from_string(html).with_header(html_header));
+                let _ = req.respond(
+                    tiny_http::Response::from_string(html)
+                        .with_header(html_header)
+                        .with_header(no_store_header()),
+                );
             }
             (method @ ("GET" | "HEAD"), "/airplane-local-ca.pem") => {
                 let path = repo_path(LOCAL_CA_CERT);
@@ -1476,7 +1493,11 @@ fn main() -> Result<()> {
                 let js = std::fs::read_to_string(BONSAI_WORKER).unwrap_or_else(|_| {
                     "postMessage({status:'error',detail:'worker missing'});".into()
                 });
-                let _ = req.respond(tiny_http::Response::from_string(js).with_header(js_header));
+                let _ = req.respond(
+                    tiny_http::Response::from_string(js)
+                        .with_header(js_header)
+                        .with_header(no_store_header()),
+                );
             }
             (method @ ("GET" | "HEAD"), path) if path.starts_with("/vendor/") => {
                 let name = path.trim_start_matches("/vendor/");

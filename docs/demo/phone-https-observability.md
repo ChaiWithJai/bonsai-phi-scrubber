@@ -111,6 +111,33 @@ The server log emits lines like:
 scrub: backend=mac-edge words=25 passes=5 redactions=4 residual=0 scrub_ms=14024 structure_ms=2593 total_ms=16650
 ```
 
+## Chrome/iOS dictation crash profile
+
+Observed on June 26, 2026: Chrome on iPhone reached the HTTPS app and reported
+WebGPU support, but the tab reset while loading the browser model. Telemetry showed:
+
+- user agent: `CriOS` on iPhone;
+- hardware concurrency: 4;
+- `device_memory`: `0`;
+- repeated `/bonsai-worker.js` and `/vendor/transformers.js` requests;
+- Browser model status moving through `loading Bonsai q1 ONNX weights`,
+  `download 100%`, then resetting to `idle` or timing out.
+
+Interpretation: dictation was not the primary failure. The in-page Browser GPU
+warm path was allocating enough model/runtime memory for WebKit to kill the tab.
+For the live phone demo, Browser GPU is therefore benchmark-only. The UI disables
+in-page Bonsai warmup on phone-like clients and routes the live scrub through the
+Mac-edge path over first-party HTTPS.
+
+To confirm the fix, open a fresh phone tab and watch:
+
+```bash
+curl -k https://127.0.0.1:8443/api/status | jq '.browser_requests[-20:]'
+```
+
+During dictation, a healthy live demo should show `/` and `/api/client-capability`
+requests, not repeated `/bonsai-worker.js`, `/vendor/...`, or `/models/...` fetches.
+
 ## Interpret latency
 
 "Local" means the note stays inside the first-party edge boundary. It does not

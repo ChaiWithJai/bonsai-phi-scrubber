@@ -220,7 +220,7 @@ const RESULT_STEPS = new Set(['gated','record','flush','delivered','pack']);
 const DRAFT_KEY = 'airplane-demo-draft-v3';
 const OUTBOX_KEY = 'airplane-demo-send-outbox-v1';
 const DEFAULT_BACKEND = '';
-const RUNTIME_CHOICE_VERSION = 2;
+const RUNTIME_CHOICE_VERSION = 3;
 const SCRUB_BROWSER_LOAD_TIMEOUT_MS = 5000;
 const SCRUB_BROWSER_GENERATE_TIMEOUT_MS = 10000;
 const S = { screen:'capturing', note:'', result:null, error:null, posted:false, sendNote:'', sendQueued:false, trajectoryCount:0, trajectoryNote:'', packDemo:null, packError:null, listening:false, speechMsg:'', status:null, job:null, capability:null, backend:DEFAULT_BACKEND, backendNote:'', scrubStartedAt:0, scrubPhase:'', scrubEstimate:'', browserModel:{status:'idle',detail:'not loaded',model:'onnx-community/Bonsai-1.7B-ONNX',elapsed_ms:0,tokens:0,tps:0,output_preview:''} };
@@ -257,10 +257,12 @@ function statusPill(label, ok){
 function capabilityHtml(){
   const c = S.capability || {};
   const secure = window.isSecureContext || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  const phone = isPhoneLikeClient();
   const webgpu = c.webgpu ? 'yes' : 'no';
   const webgl = c.webgl2 ? '2' : (c.webgl ? '1' : 'no');
-  const mode = c.webgpu ? 'candidate' : (secure ? 'probe' : 'https needed');
-  const note = c.webgpu ? 'Browser-local Bonsai is plausible here; next step is a local WebGPU adapter.' :
+  const mode = phone ? 'phone benchmark' : (c.webgpu ? 'candidate' : (secure ? 'probe' : 'https needed'));
+  const note = phone ? 'Phone HTTPS/WebGPU is observable, but in-page Bonsai warmup is disabled for the live demo to avoid mobile tab memory kills.' :
+    c.webgpu ? 'Browser-local Bonsai is plausible here; next step is a local WebGPU adapter.' :
     (secure ? 'WebGPU not exposed here; try the HF Bonsai Space and record the result.' : 'LAN HTTP is not a secure context on phones; HF HTTPS can still prove WebGPU.');
   return `<div class="capPanel">
     <b>Browser inference probe</b>
@@ -280,13 +282,14 @@ function capabilityHtml(){
 
 function backendHtml(){
   const gpuReady = !!(S.capability && S.capability.webgpu);
+  const phone = isPhoneLikeClient();
   const active = S.backend || '';
-  const gpuState = gpuReady ? 'WebGPU exposed' : 'capability pending';
+  const gpuState = phone ? 'benchmark only on phone' : (gpuReady ? 'WebGPU exposed' : 'capability pending');
   const bm = S.browserModel || {};
   const note = !active
-    ? 'Choose before scrubbing. Browser GPU downloads model artifacts into this browser; Mac edge skips that download and uses the laptop-local model server.'
+    ? (phone ? 'For the phone demo, use Mac edge. Browser GPU remains the benchmark challenge; loading it inside Chrome can crash the tab.' : 'Choose before scrubbing. Browser GPU downloads model artifacts into this browser; Mac edge skips that download and uses the laptop-local model server.')
     : active === 'browser-gpu'
-      ? 'You chose Browser GPU. The phone/browser may download about 300 MB of local model artifacts, then tries phone-local span generation before the verifier gate.'
+      ? (phone ? 'Phone Browser GPU is recorded as a benchmark challenge; the live scrub will use Mac edge to avoid mobile memory pressure.' : 'You chose Browser GPU. The browser may download about 300 MB of local model artifacts, then tries browser-local span generation before the verifier gate.')
       : 'You chose Mac edge. No browser model download; the note stays on your first-party local link and the laptop-local Bonsai server runs the scrub.';
   return `<div class="backendChoice">
     <b>Choose runtime path</b>
@@ -295,11 +298,11 @@ function backendHtml(){
         <strong>Use Mac-edge backup</strong><span>reliable demo · no browser model download</span>
       </button>
       <button class="backendBtn ${active==='browser-gpu'?'active':''}" data-act="backend" data-backend="browser-gpu">
-        <strong>Try Browser GPU</strong><span>${esc(gpuState)} · downloads local model</span>
+        <strong>${phone?'Browser GPU challenge':'Try Browser GPU'}</strong><span>${esc(gpuState)}${phone?'':' · downloads local model'}</span>
       </button>
     </div>
     <div class="mono" style="font-size:9px;line-height:1.35;color:#736c5d;margin-top:8px">${esc(note)}</div>
-    ${active==='browser-gpu'?`<div class="backendTools">
+    ${active==='browser-gpu' && !phone?`<div class="backendTools">
       <button class="miniBtn" data-act="warmBrowser">Download / warm Bonsai q1</button>
       <span class="mono" style="font-size:9px;color:#736c5d">${esc(bm.status||'idle')} · ${esc(bm.detail||'not loaded')}</span>
     </div>`:''}
@@ -863,6 +866,16 @@ async function onAct(e){
 }
 
 function selectBackend(name){
+  if(name === 'browser-gpu' && isPhoneLikeClient()){
+    S.backend = 'mac-edge';
+    S.backendNote = 'Phone Browser GPU is being treated as the benchmark challenge for this demo. To avoid Chrome/iOS memory kills while dictating, the live phone path uses Mac-edge Bonsai over first-party HTTPS.';
+    S.speechMsg = 'phone demo uses Mac edge';
+    if(S.browserModel && S.browserModel.status === 'loading') browserModelStatus('idle','phone demo avoids in-page model warmup');
+    saveDraft();
+    render();
+    updateSecureContextCallout();
+    return;
+  }
   S.backend = name === 'browser-gpu' ? 'browser-gpu' : 'mac-edge';
   S.backendNote = S.backend === 'browser-gpu'
     ? 'Browser GPU selected. This may download local model artifacts into the browser before falling back if needed.'
@@ -952,6 +965,15 @@ function workerRequest(type, payload={}, done=['ready','error'], timeoutMs=12000
 }
 
 async function warmBrowserModel(){
+  if(isPhoneLikeClient()){
+    browserModelStatus('error','phone demo disables in-page Bonsai warmup to avoid mobile tab memory kills');
+    S.backend = 'mac-edge';
+    S.backendNote = 'Browser GPU warmup is the benchmark challenge, not the live-demo path. Use Mac edge on the phone, then measure Browser GPU separately.';
+    saveDraft();
+    render();
+    await postClientCapability();
+    return;
+  }
   if(!window.isSecureContext || !navigator.gpu){
     browserModelStatus('error', window.isSecureContext ? 'navigator.gpu unavailable' : 'HTTPS required for WebGPU');
     return;
@@ -1361,6 +1383,15 @@ function showSlack(){
 $slack.addEventListener('click',e=>{ if(e.target===$slack) $slack.style.display='none'; });
 
 loadDraft();
+if(isPhoneLikeClient()){
+  if(S.backend === 'browser-gpu') {
+    S.backend = 'mac-edge';
+    S.backendNote = 'Phone Browser GPU is benchmark-only for this demo; Mac edge avoids mobile tab memory pressure during dictation.';
+  }
+  if(S.browserModel && S.browserModel.status === 'loading') {
+    S.browserModel = Object.assign({}, S.browserModel, {status:'idle', detail:'phone demo avoids in-page model warmup', elapsed_ms:0, tokens:0, tps:0});
+  }
+}
 if(pendingSend()){
   S.sendQueued=true;
   S.sendNote='clean record queued locally; will retry when the edge is reachable';
