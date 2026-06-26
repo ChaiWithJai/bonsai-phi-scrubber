@@ -20,6 +20,7 @@ SERVER_KEY="$CERT_DIR/airplane-local-server.key"
 SERVER_CSR="$CERT_DIR/airplane-local-server.csr"
 SERVER_CERT="$CERT_DIR/airplane-local-server.pem"
 SAN_FILE="$CERT_DIR/san.conf"
+CA_CONF="$CERT_DIR/ca.conf"
 
 mkdir -p "$CERT_DIR"
 
@@ -31,10 +32,31 @@ local_ips() {
   } | awk 'NF && $1 != "127.0.0.1"' | sort -u
 }
 
+ca_needs_regen=0
 if [[ ! -f "$CA_KEY" || ! -f "$CA_CERT" ]]; then
+  ca_needs_regen=1
+elif ! openssl x509 -in "$CA_CERT" -noout -subject 2>/dev/null | grep -q "Bonsai PHI Scrubber Local Dev CA"; then
+  ca_needs_regen=1
+fi
+
+if [[ "$ca_needs_regen" == "1" ]]; then
+  rm -f "$CA_KEY" "$CA_CERT" "$SERVER_KEY" "$SERVER_CSR" "$SERVER_CERT"
+  cat > "$CA_CONF" <<'EOF'
+[req]
+distinguished_name=req_distinguished_name
+x509_extensions=v3_ca
+prompt=no
+[req_distinguished_name]
+CN=Bonsai PHI Scrubber Local Dev CA
+[v3_ca]
+basicConstraints=critical,CA:true
+keyUsage=critical,keyCertSign,cRLSign
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid:always,issuer
+EOF
   openssl req -x509 -newkey rsa:2048 -days 825 -nodes \
     -keyout "$CA_KEY" -out "$CA_CERT" \
-    -subj "/CN=Bonsai PHI Scrubber Local Dev CA" >/dev/null 2>&1
+    -config "$CA_CONF" >/dev/null 2>&1
 fi
 
 {
@@ -45,7 +67,7 @@ fi
   echo "[req_distinguished_name]"
   echo "CN=airplane.local"
   echo "[v3_req]"
-  echo "keyUsage=keyEncipherment,dataEncipherment"
+  echo "keyUsage=digitalSignature,keyEncipherment"
   echo "extendedKeyUsage=serverAuth"
   echo "subjectAltName=@alt_names"
   echo "[alt_names]"

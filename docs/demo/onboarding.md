@@ -83,6 +83,18 @@ ipconfig getifaddr en0
 Then use `https://<that-ip>:8443` for the primary phone demo. Use
 `http://<that-ip>:8099` only for setup checks or fallback.
 
+If `https://<that-ip>:8443` shows an invalid response or certificate warning
+after a repo update, regenerate the local development certificate and trust the
+new CA on the phone:
+
+```sh
+rm -f .airplane/certs/airplane-local-*.pem .airplane/certs/airplane-local-*.key .airplane/certs/airplane-local-*.csr
+./run.sh https-proxy
+```
+
+Then install/trust `.airplane/certs/airplane-local-ca.pem` on the phone and open
+a fresh `https://<that-ip>:8443` tab. Do not reuse a stale tab from the old cert.
+
 Use a first-party network: same Wi-Fi, Personal Hotspot, clinic LAN, or
 IT-managed VPN. Do not use a public tunnel for the scrub workflow. The demo
 works because the phone talks to your own edge node; only the scrubbed Slack

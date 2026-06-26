@@ -135,6 +135,16 @@ Open `http://localhost:8099` on your laptop, or open
 is on the Mac's Personal Hotspot, use the hotspot IP printed by the server with
 `:8443`. Use the plain `:8099` phone URL only for setup checks or fallback.
 
+If the phone says the `:8443` page gave an invalid response, restart the HTTPS
+proxy so it regenerates a browser-compatible local certificate, then trust the
+new `.airplane/certs/airplane-local-ca.pem` certificate on the phone and open a
+fresh tab:
+
+```bash
+rm -f .airplane/certs/airplane-local-*.pem .airplane/certs/airplane-local-*.key .airplane/certs/airplane-local-*.csr
+./run.sh https-proxy
+```
+
 In the UI:
 
 1. Tap **Use sample note** or dictate a synthetic note.
