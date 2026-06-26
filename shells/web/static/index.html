@@ -1024,20 +1024,30 @@ async function postClientCapability(){
   }catch(_){}
 }
 
-async function detectClientCapability(){
-  const cap = {
+function basicClientCapability(label='page-heartbeat'){
+  return {
     user_agent:navigator.userAgent || '',
     platform:navigator.platform || '',
     language:navigator.language || '',
     webgpu:!!navigator.gpu,
     webgl:webglAvailable('webgl') || webglAvailable('experimental-webgl'),
     webgl2:webglAvailable('webgl2'),
-    webgpu_error:'',
-    browser_model:S.browserModel,
+    webgpu_error: window.isSecureContext ? '' : 'page is not a secure context',
+    browser_model:Object.assign({}, S.browserModel, {status:S.browserModel.status || label}),
     hardware_concurrency:navigator.hardwareConcurrency || 0,
     device_memory:navigator.deviceMemory || 0,
     screen:{width:screen.width||0,height:screen.height||0,dpr:devicePixelRatio||1}
   };
+}
+
+async function postClientHeartbeat(label='page-heartbeat'){
+  S.capability = Object.assign(basicClientCapability(label), {browser_model:S.browserModel});
+  await postClientCapability();
+}
+
+async function detectClientCapability(){
+  const cap = basicClientCapability('capability-probe');
+  cap.webgpu_error = '';
   if(navigator.gpu && window.isSecureContext){
     try{
       const adapter = await navigator.gpu.requestAdapter();
@@ -1114,6 +1124,8 @@ setInterval(()=>{ if(S.job && (S.job.status==='running'||S.job.status==='retryin
 setInterval(()=>{ replayPendingSend('scheduled outbox replay'); }, 3000);
 window.addEventListener('online',()=>replayPendingSend('network restored'));
 window.addEventListener('focus',()=>replayPendingSend('window focused'));
+window.addEventListener('pageshow',()=>postClientHeartbeat('pageshow'));
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) postClientHeartbeat('visible'); });
 window.addEventListener('popstate',()=>{ S.screen=routeStep(); render(); });
 
 async function refreshStatus(){
@@ -1128,6 +1140,7 @@ async function refreshStatus(){
     }
   }catch(_){}
 }
+postClientHeartbeat('boot');
 detectClientCapability();
 </script>
 </body>

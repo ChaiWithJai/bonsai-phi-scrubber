@@ -1501,7 +1501,7 @@ fn main() -> Result<()> {
             ("POST", "/api/client-capability") => {
                 let mut body = String::new();
                 let _ = req.as_reader().read_to_string(&mut body);
-                let observed_from = req.remote_addr().map(|addr| addr.to_string());
+                let observed_from = Some(observed_client(&req));
                 let payload = handle_client_capability(&body, observed_from).to_string();
                 let _ =
                     req.respond(tiny_http::Response::from_string(payload).with_header(json_header));

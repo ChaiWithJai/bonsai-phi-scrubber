@@ -393,6 +393,12 @@ proof should show a non-local client with `looks_like_iphone: true` requesting
 `/`, `/bonsai-worker.js`, `/vendor/transformers.js`, and ultimately
 `/models/onnx-community/Bonsai-1.7B-ONNX/...`.
 
+The main demo page now sends an immediate PHI-free client heartbeat before the
+WebGPU adapter probe runs, then posts richer capability/model telemetry after
+the probe completes. That avoids a false negative where an iPhone loads the page
+but Safari stalls or rejects `navigator.gpu.requestAdapter()` before
+`/api/client-capability` receives anything.
+
 ## Optimal Path From Here
 
 ### Step 1: Keep The Current Demo Stable

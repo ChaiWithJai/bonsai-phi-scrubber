@@ -28,11 +28,15 @@ start="$(date +%s)"
 while true; do
   status="$(curl "${CURL_ARGS[@]}" "$URL/api/status" 2>/dev/null || true)"
   if [[ -n "$status" ]] && jq -e '.client_capability != null' >/dev/null 2>&1 <<<"$status"; then
-    jq '.client_capability' <<<"$status" | tee "$OUT"
-    echo
     observed_from="$(jq -r '.client_capability.observed_from // ""' <<<"$status")"
     platform="$(jq -r '.client_capability.platform // ""' <<<"$status")"
     ua="$(jq -r '.client_capability.user_agent // ""' <<<"$status")"
+    if [[ "${AIRPLANE_ALLOW_LOCAL_PHONE_OBSERVATION:-0}" != "1" && ( "$observed_from" == 127.* || "$observed_from" == "::1" || "$observed_from" == localhost* ) ]]; then
+      sleep 2
+      continue
+    fi
+    jq '.client_capability' <<<"$status" | tee "$OUT"
+    echo
     if [[ "$platform" != *"iPhone"* && "$ua" != *"iPhone"* ]]; then
       echo "warning: capability reported, but it does not look like iPhone telemetry" >&2
       echo "  observed_from: $observed_from" >&2
