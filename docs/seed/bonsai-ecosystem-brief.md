@@ -28,6 +28,17 @@
 - **No local evidence** of Core ML / Apple Neural Engine / "Locally AI" wiring for text. iOS text = mlx-swift loading MLX weights (proven for image, not yet wired for text).
 - ⚠️ **Headline risk (R1 in the design spec):** 1.7B-text on **iPhone 11 / A13** is unproven. The proven device run is a *different* (image, 4B) model on a *2023* phone. Treat M3 as a measurement gate.
 
+**Browser / WebGPU path (new evidence):**
+- Hugging Face hosts `webml-community/bonsai-webgpu`, a running Space for a
+  Bonsai 1-bit WebGPU demo.
+- Its source uses `@huggingface/transformers` and loads
+  `onnx-community/Bonsai-1.7B-ONNX` with `device: "webgpu"` and `dtype: "q1"`.
+- This is the best first phone capability test because it checks WebGPU +
+  Bonsai-family ONNX execution before we write any code.
+- It still does not prove our workflow: no PHI scrub pack, no verifier gate, no
+  structured span contract, no offline/cache guarantee, and no Keychain/Secure
+  Enclave story.
+
 **Port implications:** method ≈ `complete(messages, json_schema, sampling) -> String`; schema/GBNF is first-class; carry sampling explicitly; return raw string and let the core strip `<think>`, extract JSON, validate, clamp. CLI adapter enforces grammar **server-side**; iOS adapter must enforce it **client-side** (or validate-and-retry).
 
 ## B. Positioning (drives the README role-modeling)

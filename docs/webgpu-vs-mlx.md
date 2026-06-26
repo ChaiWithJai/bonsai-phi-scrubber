@@ -68,6 +68,10 @@ community is already standardizing around.
 
 Ecosystem paths worth testing:
 
+- **Bonsai WebGPU Hugging Face Space:** a community demo already runs
+  `onnx-community/Bonsai-1.7B-ONNX` in-browser through Transformers.js/WebGPU.
+  This is the first URL to open on the phone:
+  <https://huggingface.co/spaces/webml-community/bonsai-webgpu>.
 - **WebLLM / MLC:** browser LLM runtime over WebGPU with an OpenAI-style API
   surface. This is the closest conceptual match to the current `llama-server`
   route.
@@ -138,6 +142,8 @@ The model runtime can change. The gate does not.
 
 - [WebLLM documentation](https://webllm.mlc.ai/)
 - [MLC WebLLM GitHub](https://github.com/mlc-ai/web-llm)
+- [Bonsai WebGPU Hugging Face Space](https://huggingface.co/spaces/webml-community/bonsai-webgpu)
+- [Bonsai WebGPU Space source](https://huggingface.co/spaces/webml-community/bonsai-webgpu/tree/main)
 - [Transformers.js documentation](https://huggingface.co/docs/transformers.js)
 - [ONNX Runtime Web documentation](https://onnxruntime.ai/docs/get-started/with-javascript/web.html)
 - [WebKit WebGPU updates](https://webkit.org/blog/)

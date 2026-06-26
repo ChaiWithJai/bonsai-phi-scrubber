@@ -33,12 +33,49 @@ From current ecosystem evidence:
 - WebLLM runs LLM inference in the browser with WebGPU and an OpenAI-compatible
   API surface.
 - Transformers.js supports WebGPU-backed browser inference.
+- Hugging Face hosts a community Bonsai WebGPU demo that loads
+  `onnx-community/Bonsai-1.7B-ONNX` through `@huggingface/transformers` with
+  `device: "webgpu"` and `dtype: "q1"`.
 - ONNX Runtime Web has a WebGPU execution provider.
 - Safari 26 / iOS 26 adds WebGPU support.
 - MLX and MLX Swift are the Apple-native path, and MLX Swift examples include
   language-model apps.
 - PrismML publishes Bonsai MLX text artifacts, but that does not by itself prove
   our exact model, prompt shape, structured output, and device target.
+
+## First Phone URL To Try
+
+Open this directly on the iPhone:
+
+<https://huggingface.co/spaces/webml-community/bonsai-webgpu>
+
+Record:
+
+- iPhone model;
+- iOS version;
+- Safari version;
+- whether the page loads;
+- whether it reports WebGPU unsupported;
+- model load progress and total download size if shown;
+- whether generation starts;
+- tokens/sec if shown;
+- whether the tab survives backgrounding and reload;
+- whether a second load is warm from cache.
+
+What this proves if it works:
+
+- the phone/browser can expose WebGPU;
+- Transformers.js can execute a Bonsai-family ONNX artifact in-browser;
+- Q1 WebGPU execution is plausible on this device class.
+
+What it does **not** prove:
+
+- our PHI scrub workflow runs locally;
+- structured span JSON can be forced reliably;
+- the verifier gate is wired in-browser;
+- the model can run offline after first load;
+- native iPhone / MLX Swift viability;
+- Secure Enclave or Keychain storage.
 
 ## Means, Motivation, Opportunity
 
@@ -113,6 +150,8 @@ Opportunity test:
 
 1. **Device capability**
    - Confirm iPhone model, iOS version, Safari version.
+   - Open the Hugging Face Bonsai WebGPU Space:
+     <https://huggingface.co/spaces/webml-community/bonsai-webgpu>.
    - Open a WebGPU report page and record `navigator.gpu`, adapter name if
      exposed, supported limits, and `shader-f16` support.
    - Check whether WebGPU works in Safari only or also installed iOS browser
