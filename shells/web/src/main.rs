@@ -446,7 +446,25 @@ fn slack_post(record: &Value) -> Result<()> {
 }
 
 fn handle_send(body: &str) -> Value {
-    let input: Value = serde_json::from_str(body).unwrap_or_else(|_| json!({}));
+    let input: Value = match serde_json::from_str(body) {
+        Ok(v) => v,
+        Err(e) => return json!({"ok": false, "error": format!("parse request body: {e}")}),
+    };
+    let text = trajectory_text(&input["record"]);
+    if text.trim().is_empty() {
+        return json!({"ok": false, "error": "Slack record is empty"});
+    }
+    let pack = match Pack::load(&pack_path()).context("load coach-session pack") {
+        Ok(p) => p,
+        Err(e) => return json!({"ok": false, "error": format!("{e:#}")}),
+    };
+    if let GateDecision::Block { residual } = VerifierGate::new(&pack.rules).check(&text) {
+        return json!({
+            "ok": false,
+            "error": "Slack gate blocked residual identifiers",
+            "residual_count": residual.len()
+        });
+    }
     match slack_post(&input["record"]) {
         Ok(()) => json!({"ok": true}),
         Err(e) => json!({"ok": false, "error": format!("{e}")}),
@@ -738,6 +756,22 @@ credentials:
         assert_eq!(blocked["ok"], false, "{blocked}");
         assert_eq!(blocked["residual_count"], 1, "{blocked}");
         assert_eq!(TRAJECTORY_COUNT.load(Ordering::SeqCst), before);
+    }
+
+    #[test]
+    fn slack_gate_blocks_residual_identifier_before_sink() {
+        let blocked = handle_send(
+            r#"{"record":{"themes":["member CM-204815"],"commitments":[],"follow_ups":[]}}"#,
+        );
+        assert_eq!(blocked["ok"], false, "{blocked}");
+        assert_eq!(blocked["residual_count"], 1, "{blocked}");
+        assert!(
+            blocked["error"]
+                .as_str()
+                .unwrap()
+                .contains("Slack gate blocked"),
+            "{blocked}"
+        );
     }
 
     #[test]

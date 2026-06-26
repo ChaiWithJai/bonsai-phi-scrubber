@@ -277,7 +277,7 @@ const screens = {
    <div class="grow center" style="gap:18px">
      <div style="width:62px;height:62px;border-radius:50%;background:${S.posted?'var(--green)':'#e3c98a'};display:flex;align-items:center;justify-content:center;color:#fff;font-size:30px;box-shadow:0 14px 30px -10px rgba(31,122,77,.4)">${S.posted?'✓':'✈'}</div>
      <div><h1 style="font-size:30px">${S.posted?'Posted':'Held'}</h1>
-       <div class="sub" style="margin-top:8px">${S.posted?'Clean record landed in<br><span class="mono" style="font-weight:700;color:var(--ink)">#coach-records</span>':esc(S.sendNote||'Set SLACK_WEBHOOK_URL to post for real')}</div></div></div>
+       <div class="sub" style="margin-top:8px">${S.posted?'Clean record landed in<br><span class="mono" style="font-weight:700;color:var(--ink)">#coach-records</span>':esc(S.sendNote||'Set SLACK_WEBHOOK_URL or SLACK_BOT_TOKEN to post for real')}</div></div></div>
    <div style="background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:9px" class="mono">
      <div style="display:flex;justify-content:space-between;font-size:12px;color:#736c5d"><span>record</span><span style="color:var(--ink)">${esc(rec.client_pseudonym||'CLIENT')}</span></div>
      <div style="display:flex;justify-content:space-between;font-size:12px;color:#736c5d"><span>identifiers sent</span><span style="color:var(--green);font-weight:700">0</span></div>
@@ -473,7 +473,7 @@ function showSlack(){
            <span style="font:700 13px var(--sans);color:var(--red)">↑ No name. No member ID.</span>
            <span style="font:500 12px var(--sans);color:#9a7a6e">Not redacted out — never structured in.</span></div>
        </div></div>
-     <div class="mono" style="font-size:10px;color:#a39a86;text-align:center;margin-top:16px">${S.posted?'✓ posted to #coach-records — open Slack to evaluate':'preview · set SLACK_WEBHOOK_URL to post for real'}</div>
+     <div class="mono" style="font-size:10px;color:#a39a86;text-align:center;margin-top:16px">${S.posted?'✓ posted to #coach-records — open Slack to evaluate':'preview · set SLACK_WEBHOOK_URL or SLACK_BOT_TOKEN to post for real'}</div>
      <button class="btn" data-act="close" onclick="document.getElementById('slack').style.display='none'" style="margin-top:12px;background:var(--ink)">Close</button>
    </div>`;
   $slack.style.display='flex';
