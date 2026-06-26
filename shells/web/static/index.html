@@ -102,7 +102,7 @@
 
 <script>
 const NOTE = "Met with Maria Alvarez (CM-204815) at her place Tuesday. She's the one whose daughter just started college. Committed to a 10-min morning walk daily.";
-const S = { airplane:true, screen:'capturing', note:'', result:null, error:null, posted:false, sendNote:'', trajectoryCount:0, trajectoryNote:'', packDemo:null, packError:null, listening:false, speechMsg:'', status:null };
+const S = { screen:'capturing', note:'', result:null, error:null, posted:false, sendNote:'', trajectoryCount:0, trajectoryNote:'', packDemo:null, packError:null, listening:false, speechMsg:'', status:null };
 let recognizer = null;
 
 const $phone = document.getElementById('phone');
@@ -140,7 +140,7 @@ const screens = {
    <div class="captureTop">
      <div class="brandMark">✈</div>
      <div style="font:700 15px var(--sans);letter-spacing:0">New session</div>
-     <span class="pill" style="margin-left:auto;color:var(--amber);background:#f6ecd6;border:1px solid #e3c98a">offline</span></div>
+     <span class="pill" style="margin-left:auto;color:var(--amber);background:#f6ecd6;border:1px solid #e3c98a">local</span></div>
    <div class="captureHero">
      <div class="mono" style="font-size:10px;color:#a39a86;letter-spacing:.08em">CAPTURE</div>
      <h1>Dictate the session</h1>
@@ -226,7 +226,6 @@ const screens = {
    const follow=(rec.follow_ups||[]);
    const risks=(rec.risk_flags||[]);
    const signal=(rec.autonomy_delta&&rec.autonomy_delta.signals||[]).join(' · ');
-   const sendLabel = S.airplane ? 'Send to #coach-records' : 'Send to #coach-records';
    return `
    <div style="display:flex;align-items:center;justify-content:space-between">
      <div style="font:700 17px var(--sans);letter-spacing:-.01em">Care record</div>
@@ -253,15 +252,15 @@ const screens = {
      </div>
    </div>
    <div class="mono" style="display:flex;align-items:center;gap:7px;margin-top:12px;font-size:11px;font-weight:600;color:var(--amber)">
-     <span style="font-size:13px">✈</span>${S.airplane?'still offline · not yet sent':'online'}</div>
-   <button class="btn" data-act="send" style="margin-top:11px">${sendLabel}</button>`; },
+     <span style="font-size:13px">→</span>gate-clean · ready for Slack sink</div>
+   <button class="btn" data-act="send" style="margin-top:11px">Send to #coach-records</button>`; },
 
  held(){ setDark(false); return `
    <div style="font:700 17px var(--sans);letter-spacing:-.01em">Sending…</div>
    <div style="margin-top:16px;background:#fbf2dd;border:1.5px solid #e3c98a;border-radius:16px;padding:15px;display:flex;gap:12px;align-items:flex-start">
-     <div style="width:30px;height:30px;flex:none;border-radius:9px;background:#f3e2bd;display:flex;align-items:center;justify-content:center;color:var(--gold);font-size:16px">✈</div>
-     <div><div style="font:700 14px var(--sans);color:var(--amber)">No network — radios off</div>
-       <div style="font:400 12.5px/1.5 var(--sans);color:#9a7a3a;margin-top:4px">Nothing leaves the device. The clean record is held until you reconnect.</div></div></div>
+     <div style="width:30px;height:30px;flex:none;border-radius:9px;background:#f3e2bd;display:flex;align-items:center;justify-content:center;color:var(--gold);font-size:16px">→</div>
+     <div><div style="font:700 14px var(--sans);color:var(--amber)">Slack sink check</div>
+       <div style="font:400 12.5px/1.5 var(--sans);color:#9a7a3a;margin-top:4px">Nothing leaves until the verifier approves the exact outbound record.</div></div></div>
    <div style="margin-top:16px;background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:14px">
      <div style="display:flex;align-items:center;justify-content:space-between">
        <span class="mono" style="font-size:12px;font-weight:600;color:#736c5d;letter-spacing:.03em">OUTBOX</span>
@@ -269,18 +268,17 @@ const screens = {
      <div style="display:flex;align-items:center;gap:11px;margin-top:13px">
        <div class="mono" style="width:34px;height:34px;flex:none;border-radius:9px;background:#efe9da;display:flex;align-items:center;justify-content:center;font:700 12px var(--mono);color:#736c5d">${esc((S.result.record.client_pseudonym||'7F3A').slice(-2))}</div>
        <div style="flex:1"><div style="font:600 13px var(--sans)">${esc(S.result.record.client_pseudonym||'CLIENT')} · care record</div>
-         <div class="mono" style="font-size:11px;color:#a39a86;margin-top:3px">clean · awaiting network</div></div>
+         <div class="mono" style="font-size:11px;color:#a39a86;margin-top:3px">clean · awaiting sink</div></div>
        <span style="width:8px;height:8px;border-radius:50%;background:var(--gold)"></span></div></div>
    <div class="grow" style="display:flex;align-items:flex-end">
-     <div style="font:600 16px/1.35 var(--sans);letter-spacing:-.01em">It refuses to send.<br><span style="color:var(--amber)">Good — that's the proof.</span></div></div>
-   ${toggleHTML('Airplane mode — turn off to send', false)}`; },
+     <div style="font:600 16px/1.35 var(--sans);letter-spacing:-.01em">The sink only opens<br><span style="color:var(--amber)">after the verifier passes.</span></div></div>`; },
 
  flush(){ setDark(true,true); return `
-   <div style="font:700 18px var(--sans);color:#eef4ee;letter-spacing:-.01em">Connectivity restored</div>
+   <div style="font:700 18px var(--sans);color:#eef4ee;letter-spacing:-.01em">Sending to Slack</div>
    ${ '' }
    <div style="display:flex;align-items:center;justify-content:space-between;border:1px solid #243029;background:rgba(255,255,255,.02);border-radius:14px;padding:12px 14px;margin-top:15px">
-     <div style="display:flex;align-items:center;gap:10px"><span style="color:#8c8475;font-size:15px">✈</span><span style="font:600 13px var(--sans);color:#cfd6cd">Airplane mode</span></div>
-     <span class="sw off"><b></b></span></div>
+     <div style="display:flex;align-items:center;gap:10px"><span style="color:#8c8475;font-size:15px">→</span><span style="font:600 13px var(--sans);color:#cfd6cd">Slack sink</span></div>
+     <span class="pill" style="color:#9bd9b3;border:1px solid #2c4a38;background:rgba(54,194,129,.08)">VERIFYING</span></div>
    <div class="grow center" style="gap:20px">
      <div style="position:relative;width:78px;height:78px;display:flex;align-items:center;justify-content:center">
        <div style="position:absolute;inset:0;border-radius:50%;border:3px solid #1b2c22"></div>
@@ -297,7 +295,7 @@ const screens = {
    return `
    <div class="grow center" style="gap:18px">
      <div style="width:62px;height:62px;border-radius:50%;background:${S.posted?'var(--green)':'#e3c98a'};display:flex;align-items:center;justify-content:center;color:#fff;font-size:30px;box-shadow:0 14px 30px -10px rgba(31,122,77,.4)">${S.posted?'✓':'✈'}</div>
-     <div><h1 style="font-size:30px">${S.posted?'Posted':'Held'}</h1>
+     <div><h1 style="font-size:30px">${S.posted?'Posted':'Not posted'}</h1>
        <div class="sub" style="margin-top:8px">${S.posted?'Clean record landed in<br><span class="mono" style="font-weight:700;color:var(--ink)">#coach-records</span>':esc(S.sendNote||'Set SLACK_WEBHOOK_URL or SLACK_BOT_TOKEN to post for real')}</div></div></div>
    <div style="background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:9px" class="mono">
      <div style="display:flex;justify-content:space-between;font-size:12px;color:#736c5d"><span>record</span><span style="color:var(--ink)">${esc(rec.client_pseudonym||'CLIENT')}</span></div>
@@ -374,7 +372,7 @@ function render(){
 
 async function onAct(e){
   const act = e.currentTarget.getAttribute('data-act');
-  if(act==='toggle'){ S.airplane=!S.airplane; if(S.screen==='held' && !S.airplane){ go('flush'); return doSend(); } return render(); }
+  if(act==='toggle') return render();
   if(act==='dictate') return toggleDictation();
   if(act==='sample'){ S.note=NOTE; S.speechMsg='sample loaded'; return render(); }
   if(act==='scrub'){
@@ -386,7 +384,7 @@ async function onAct(e){
   if(act==='back') return go('capturing');
   if(act==='gate') return go('gated');
   if(act==='record') return go('record');
-  if(act==='send') return go(S.airplane ? 'held' : 'flush');
+  if(act==='send'){ go('flush'); return doSend(); }
   if(act==='slack') return showSlack();
   if(act==='pack'){ go('pack'); return doPackReveal(); }
   if(act==='packRetry'){ S.packDemo=null; S.packError=null; go('pack'); return doPackReveal(); }

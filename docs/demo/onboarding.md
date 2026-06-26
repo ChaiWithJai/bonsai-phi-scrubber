@@ -82,8 +82,8 @@ The fix is to put both devices on the iPhone's own local network:
 4. Tap **"continue →"** to the green **Verifier gate** (residual identifiers: **0**).
 5. Review the clean **Care record** (with the commitment).
 6. Tap **"Send to #coach-records."**
-7. With the in-app airplane toggle **ON**, the send is **HELD** ("refuses to send").
-8. Flip the **in-app airplane toggle OFF** → the queue flushes → **"Posted"** → tap **"View in #coach-records"** to see the de-identified Slack card.
+7. The app re-runs the verifier over the exact Slack payload, then posts only if the Slack credential is configured.
+8. On success, tap **"View Slack"** to see the de-identified Slack card; in preview mode the screen explains which credential is missing.
 
 ## Wire Slack — the real post (the payoff)
 
@@ -143,7 +143,7 @@ That smoke posts one synthetic, gate-clean record through `/api/send`. It fails 
 
 ## Warnings
 
-- **Do NOT put the phone in REAL airplane mode.** That drops Wi-Fi/hotspot and the phone can't reach the Mac. The **"Airplane mode" toggle IN THE APP** is the demo control — that's the one you flip.
+- **Do NOT put the phone in REAL airplane mode.** That drops Wi-Fi/hotspot and the phone can't reach the Mac. Use the app's send flow; the verifier and Slack sink decide whether anything can leave.
 - **The "device" is honestly the laptop as the edge node** — it runs Bonsai locally. The phone is just the touchscreen. The raw note crosses only the local link, never the cloud.
 - **Keep the Mac awake** and keep **both** servers running for the whole demo.
 - **Don't run `./run.sh eval`** at the same time — it contends with the model and makes the scrub crawl.
