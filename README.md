@@ -386,6 +386,20 @@ can leave. The iOS scaffold currently lets builders switch between an
 backend-shaped scrub response. That is interoperability scaffolding, not the
 real iPhone 11 hardware proof.
 
+## Deprecated Patterns And Revival
+
+The repo keeps old demo patterns as ecosystem history instead of deleting them.
+If you want to study or revive native iOS, literal radio-off airplane mode,
+public-tunnel capability probes, older clinic/HCL pack language, or other
+superseded work, start here:
+
+- [`docs/deprecations/demo-cleanup-proposal.md`](docs/deprecations/demo-cleanup-proposal.md)
+- [`docs/deprecations/gitops-revival-runbook.md`](docs/deprecations/gitops-revival-runbook.md)
+- [`docs/deprecations/decision-records/`](docs/deprecations/decision-records/)
+
+The rule is: keep the current demo path clean, but make older patterns easy to
+recover with Git when a builder has a real use case.
+
 ## Troubleshooting
 
 | Symptom | Fix |
@@ -409,6 +423,7 @@ real iPhone 11 hardware proof.
 | `shells/ios/` | Simulator-safe native scaffold with selectable backend mocks. |
 | `packs/coach-session/` | Reference pack and synthetic eval set. |
 | `docs/model-setup.md` | Model download/runtime details. |
+| `docs/deprecations/` | Cleanup proposal, deprecated-pattern decisions, and GitOps revival runbook. |
 | `docs/webgpu-vs-mlx.md` | Phone-path comparison: native MLX Swift vs browser WebGPU. |
 | `docs/browser-gpu-spike-report.md` | Spike report narrowing the phone path to browser GPU first. |
 | `docs/hipaa-cloudflare-boundary.md` | Why Cloudflare HTTPS helps capability probes but is not HIPAA compliance. |
