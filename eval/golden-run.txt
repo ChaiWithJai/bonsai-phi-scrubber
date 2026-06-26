@@ -4,10 +4,10 @@ model layer     : rules ∪ Bonsai-1.7B
 decoding        : 5 seeded passes unioned (temp 0.5, seeds 42..)  [deterministic]
 notes           : 20
 recall          : 100.0%  (70/70)
-precision       : 46.4%  (70/151 predicted)
+precision       : 51.5%  (70/136 predicted)
 hard-case recall: 100.0%  (54/54)
 leakage (missed): 0
-over-redactions : 81
+over-redactions : 66
 recall gate     : >= 99%
 
 note-01  gate=PASS
