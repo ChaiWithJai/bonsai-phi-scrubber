@@ -894,17 +894,25 @@ fn handle_pack_demo() -> Value {
 }
 
 fn local_ips() -> Vec<String> {
-    // best-effort: ask the OS for a route-local address
+    // Best effort: advertise both normal Wi-Fi and the macOS hotspot bridge.
     std::process::Command::new("sh")
         .arg("-c")
-        .arg("ipconfig getifaddr en0 2>/dev/null; ipconfig getifaddr en1 2>/dev/null")
+        .arg(
+            "ipconfig getifaddr en0 2>/dev/null; \
+             ipconfig getifaddr en1 2>/dev/null; \
+             ifconfig bridge100 2>/dev/null | awk '/inet / {print $2}'",
+        )
         .output()
         .ok()
         .map(|o| {
-            String::from_utf8_lossy(&o.stdout)
+            let mut ips = String::from_utf8_lossy(&o.stdout)
                 .split_whitespace()
                 .map(|s| s.to_string())
-                .collect()
+                .filter(|s| s != "127.0.0.1")
+                .collect::<Vec<_>>();
+            ips.sort();
+            ips.dedup();
+            ips
         })
         .unwrap_or_default()
 }

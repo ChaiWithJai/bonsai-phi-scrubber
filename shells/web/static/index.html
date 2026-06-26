@@ -110,7 +110,8 @@ const NOTE = "Met with Maria Alvarez (CM-204815) at her place Tuesday. She's the
 const STEPS = new Set(['capturing','scrubbing','gated','record','flush','delivered','pack']);
 const RESULT_STEPS = new Set(['gated','record','flush','delivered','pack']);
 const DRAFT_KEY = 'airplane-demo-draft-v2';
-const S = { screen:'capturing', note:'', result:null, error:null, posted:false, sendNote:'', trajectoryCount:0, trajectoryNote:'', packDemo:null, packError:null, listening:false, speechMsg:'', status:null, job:null };
+const OUTBOX_KEY = 'airplane-demo-send-outbox-v1';
+const S = { screen:'capturing', note:'', result:null, error:null, posted:false, sendNote:'', sendQueued:false, trajectoryCount:0, trajectoryNote:'', packDemo:null, packError:null, listening:false, speechMsg:'', status:null, job:null };
 let recognizer = null;
 
 const $phone = document.getElementById('phone');
@@ -270,13 +271,15 @@ const screens = {
        <div style="width:72%;height:100%;background:linear-gradient(90deg,#1f7a4d,#4fd08c);background-size:18px 18px;animation:flow .7s linear infinite"></div></div></div>
    <div style="font:600 16px/1.35 var(--sans);color:#dfe6df;letter-spacing:-.01em">Now — and only now —<br><span style="color:#5fe09a">the clean record posts.</span></div>`; },
 
- delivered(){ setDark(false);
-   const r=S.result; const rec=r.record;
-   return `
-   <div class="grow center" style="gap:18px">
-     <div style="width:62px;height:62px;border-radius:50%;background:${S.posted?'var(--green)':'#e3c98a'};display:flex;align-items:center;justify-content:center;color:#fff;font-size:30px;box-shadow:0 14px 30px -10px rgba(31,122,77,.4)">${S.posted?'✓':'✈'}</div>
-     <div><h1 style="font-size:30px">${S.posted?'Posted':'Not posted'}</h1>
-       <div class="sub" style="margin-top:8px">${S.posted?'Clean record landed in<br><span class="mono" style="font-weight:700;color:var(--ink)">#coach-records</span>':esc(S.sendNote||'Set SLACK_WEBHOOK_URL or SLACK_BOT_TOKEN to post for real')}</div></div></div>
+	 delivered(){ setDark(false);
+	   const r=S.result; const rec=r.record;
+	   const title=S.posted?'Posted':(S.sendQueued?'Queued':'Not posted');
+	   const detail=S.posted?'Clean record landed in<br><span class="mono" style="font-weight:700;color:var(--ink)">#coach-records</span>':esc(S.sendNote||'Set SLACK_WEBHOOK_URL or SLACK_BOT_TOKEN to post for real');
+	   return `
+	   <div class="grow center" style="gap:18px">
+	     <div style="width:62px;height:62px;border-radius:50%;background:${S.posted?'var(--green)':'#e3c98a'};display:flex;align-items:center;justify-content:center;color:#fff;font-size:30px;box-shadow:0 14px 30px -10px rgba(31,122,77,.4)">${S.posted?'✓':'✈'}</div>
+	     <div><h1 style="font-size:30px">${title}</h1>
+	       <div class="sub" style="margin-top:8px">${detail}</div></div></div>
    <div style="background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:9px" class="mono">
      <div style="display:flex;justify-content:space-between;font-size:12px;color:#736c5d"><span>record</span><span style="color:var(--ink)">${esc(rec.client_pseudonym||'CLIENT')}</span></div>
      <div style="display:flex;justify-content:space-between;font-size:12px;color:#736c5d"><span>identifiers sent</span><span style="color:var(--green);font-weight:700">0</span></div>
@@ -362,6 +365,7 @@ function saveDraft(){
       result:sanitizeResultForDraft(S.result),
       posted:S.posted,
       sendNote:S.sendNote,
+      sendQueued:S.sendQueued,
       trajectoryCount:S.trajectoryCount,
       trajectoryNote:S.trajectoryNote
     }));
@@ -377,6 +381,7 @@ function loadDraft(){
     S.result=d.result||null;
     S.posted=!!d.posted;
     S.sendNote=d.sendNote||'';
+    S.sendQueued=!!d.sendQueued;
     S.trajectoryCount=d.trajectoryCount||0;
     S.trajectoryNote=d.trajectoryNote||'';
   }catch(_){}
@@ -425,6 +430,88 @@ function jobHtml(){
   const cls=S.job.status==='failed'?'fail':(S.job.status==='running'||S.job.status==='retrying'?'run':'');
   const edge=S.status&&S.status.slack?`${S.status.slack.route} · model ${S.status.model&&S.status.model.reachable?'ready':'off'}`:'checking edge';
   return `<div class="jobbar ${cls}"><span>${esc(S.job.kind)} · ${esc(S.job.detail||edge)}</span><b>${esc(S.job.status)} · ${age}s</b></div>`;
+}
+
+function pendingSend(){
+  try{
+    const raw=localStorage.getItem(OUTBOX_KEY);
+    if(!raw) return null;
+    const item=JSON.parse(raw);
+    if(!item || !item.send_id || !item.record) return null;
+    return item;
+  }catch(_){ return null; }
+}
+
+function savePendingSend(item){
+  try{ localStorage.setItem(OUTBOX_KEY, JSON.stringify(item)); }catch(_){}
+}
+
+function clearPendingSend(sendId){
+  const item=pendingSend();
+  if(!item || !sendId || item.send_id===sendId){
+    try{ localStorage.removeItem(OUTBOX_KEY); }catch(_){}
+  }
+}
+
+async function edgeReachable(){
+  return fetch('/api/health',{cache:'no-store'}).then(r=>r.ok).catch(()=>false);
+}
+
+function sendPost(item){
+  return fetch('/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({record:item.record,send_id:item.send_id})})
+    .then(async r=>{
+      const data = await r.json().catch(()=>({ok:false,error:`edge returned non-JSON from /api/send (${r.status})`}));
+      if(!r.ok && !data.error) data.error = `edge rejected /api/send (${r.status})`;
+      return data;
+    });
+}
+
+async function sendWithReplay(item){
+  try{
+    return await sendPost(item);
+  }catch(_){
+    const edge = await edgeReachable();
+    if(edge){
+      await new Promise(r=>setTimeout(r,350));
+      try{ return await sendPost(item); }catch(_){}
+      return {ok:false,error:'edge is reachable, but /api/send was interrupted before Slack acknowledged after retry'};
+    }
+    return {ok:false,error:`phone lost connection to edge server at ${location.host}`, queued:true};
+  }
+}
+
+async function storeTrajectory(record, detail){
+  setJob('trajectory','running',detail||'Slack accepted');
+  const traj = await fetch('/api/trajectory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({record})})
+    .then(r=>r.json()).catch(()=>({ok:false,error:'trajectory store unavailable'}));
+  if(traj.ok){ S.trajectoryCount = traj.count; S.trajectoryNote = 'trajectory stored · gate-clean'; setJob('trajectory','complete',`stored #${traj.count}`); }
+  else { S.trajectoryNote = traj.error || 'trajectory not stored'; setJob('trajectory','failed',S.trajectoryNote); }
+}
+
+async function finishAcceptedSend(item, data){
+  clearPendingSend(item.send_id);
+  S.posted=true; S.sendQueued=false; S.sendNote='';
+  if(!S.result) S.result={record:item.record,redactions:[],gate_pass:true,residual_count:0,scrubbed_text:''};
+  await storeTrajectory(item.record, data&&data.deduped?'Slack ack replayed':'Slack accepted');
+  saveDraft();
+  clearJobSoon();
+  if(S.screen==='flush' || S.screen==='record') go('delivered');
+  else render();
+}
+
+async function replayPendingSend(reason){
+  const item=pendingSend();
+  if(!item || (S.job && (S.job.status==='running'||S.job.status==='retrying'))) return false;
+  if(!await edgeReachable()) return false;
+  setJob('send','retrying',reason||'replaying queued clean record');
+  if(!S.result) S.result={record:item.record,redactions:[],gate_pass:true,residual_count:0,scrubbed_text:''};
+  const data=await sendWithReplay(item);
+  if(data.ok){ await finishAcceptedSend(item,data); return true; }
+  S.posted=false; S.sendQueued=true; S.sendNote=data.error||'clean record queued locally; waiting for edge';
+  S.trajectoryNote='trajectory pending · Slack send queued';
+  setJob('send','queued',S.sendNote);
+  saveDraft();
+  return false;
 }
 
 function render(){
@@ -549,43 +636,28 @@ async function doScrub(){
 }
 
 async function doSend(){
-  S.posted=false; S.sendNote=''; S.trajectoryNote='';
+  S.posted=false; S.sendNote=''; S.sendQueued=false; S.trajectoryNote='';
   setJob('send','running','posting clean record');
   const sendId = (window.crypto&&crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
-  const body = JSON.stringify({record:S.result.record, send_id:sendId});
+  const item = {send_id:sendId, record:S.result.record, created_at:new Date().toISOString()};
+  savePendingSend(item);
+  saveDraft();
   // real Slack post, with a minimum dwell so the flush animation reads
-  const postOnce = () => fetch('/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body})
-    .then(async r=>{
-      const data = await r.json().catch(()=>({ok:false,error:`edge returned non-JSON from /api/send (${r.status})`}));
-      if(!r.ok && !data.error) data.error = `edge rejected /api/send (${r.status})`;
-      return data;
-    });
-  const post = postOnce().catch(async ()=>{
-      const edge = await fetch('/api/health',{cache:'no-store'}).then(r=>r.ok).catch(()=>false);
-      if(edge){
-        setJob('send','retrying','edge reachable; replaying send id');
-        await new Promise(r=>setTimeout(r,350));
-        return postOnce().catch(()=>({
-          ok:false,
-          error: `edge is reachable, but /api/send was interrupted before Slack acknowledged after retry`
-        }));
-      }
-      return {
-        ok:false,
-        error: `phone lost connection to edge server at ${location.host}`
-      };
-    });
+  const post = sendWithReplay(item);
   const [data] = await Promise.all([post, new Promise(r=>setTimeout(r,1900))]);
   S.posted = !!data.ok; S.sendNote = data.ok ? '' : (data.error||'');
   if(data.ok){
-    setJob('trajectory','running',data.deduped?'Slack ack replayed':'Slack accepted');
-    const traj = await fetch('/api/trajectory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({record:S.result.record})})
-      .then(r=>r.json()).catch(()=>({ok:false,error:'trajectory store unavailable'}));
-    if(traj.ok){ S.trajectoryCount = traj.count; S.trajectoryNote = 'trajectory stored · gate-clean'; setJob('trajectory','complete',`stored #${traj.count}`); }
-    else { S.trajectoryNote = traj.error || 'trajectory not stored'; setJob('trajectory','failed',S.trajectoryNote); }
+    await finishAcceptedSend(item,data);
   } else {
-    S.trajectoryNote = 'trajectory not stored · Slack send failed';
-    setJob('send','failed',S.sendNote);
+    S.sendQueued=!!data.queued;
+    if(S.sendQueued){
+      S.sendNote='clean record queued locally; will retry when the edge is reachable';
+      S.trajectoryNote='trajectory pending · Slack send queued';
+      setJob('send','queued','waiting for edge reconnect');
+    } else {
+      S.trajectoryNote = 'trajectory not stored · Slack send failed';
+      setJob('send','failed',S.sendNote);
+    }
   }
   saveDraft();
   clearJobSoon();
@@ -650,19 +722,30 @@ function showSlack(){
 $slack.addEventListener('click',e=>{ if(e.target===$slack) $slack.style.display='none'; });
 
 loadDraft();
+if(pendingSend()){
+  S.sendQueued=true;
+  S.sendNote='clean record queued locally; will retry when the edge is reachable';
+}
 S.screen = routeStep();
 writeRoute(S.screen, true);
 render();
 refreshStatus();
 setInterval(refreshStatus, 5000);
 setInterval(()=>{ if(S.job && (S.job.status==='running'||S.job.status==='retrying')) render(); }, 1000);
+setInterval(()=>{ replayPendingSend('scheduled outbox replay'); }, 3000);
+window.addEventListener('online',()=>replayPendingSend('network restored'));
+window.addEventListener('focus',()=>replayPendingSend('window focused'));
 window.addEventListener('popstate',()=>{ S.screen=routeStep(); render(); });
 
 async function refreshStatus(){
   try{
     const res = await fetch('/api/status');
     const data = await res.json();
-    if(data.ok){ S.status=data; if(S.screen==='capturing' || S.job) render(); }
+    if(data.ok){
+      S.status=data;
+      replayPendingSend('edge status restored');
+      if(S.screen==='capturing' || S.job || S.sendQueued) render();
+    }
   }catch(_){}
 }
 </script>
