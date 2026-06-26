@@ -8,9 +8,9 @@
 <title>Airplane Mode</title>
 <style>
   :root{
-    --bg:#e7e3d8; --paper:#f5f1e8; --card:#fcfaf4; --ink:#221f19; --mut:#6b6456;
-    --line:#ece4d4; --gold:#b87814; --gold2:#c6912f; --green:#1f7a4d; --green2:#4fd08c;
-    --red:#bf3b2b; --amber:#8a5a0f;
+    --bg:#dfe6e2; --paper:#f7f7f2; --card:#ffffff; --ink:#221f19; --mut:#5d655f;
+    --line:#dce2da; --gold:#b87814; --gold2:#c6912f; --green:#1f7a4d; --green2:#4fd08c;
+    --red:#bf3b2b; --amber:#8a5a0f; --blue:#245b8f; --violet:#5b3b74;
     --sans:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',system-ui,sans-serif;
     --mono:'SF Mono','SFMono-Regular',ui-monospace,Menlo,Consolas,monospace;
   }
@@ -44,7 +44,7 @@
 
   .screen{flex:1;min-height:0;display:flex;flex-direction:column;padding:20px 24px 24px;overflow:hidden;animation:pop .35s ease}
 
-  h1{font:800 40px/.97 var(--sans);letter-spacing:-.03em;margin:0}
+  h1{font:800 40px/.97 var(--sans);letter-spacing:0;margin:0}
   .kicker{font:500 12px/1 var(--mono);letter-spacing:.07em;color:#a39a86}
   .sub{font:400 14px/1.5 var(--sans);color:var(--mut)}
   .btn{background:var(--ink);color:var(--paper);font:700 15px var(--sans);padding:16px;border-radius:15px;
@@ -69,8 +69,44 @@
   .micorb{width:33px;height:33px;border-radius:50%;background:rgba(255,255,255,.18);display:inline-flex;align-items:center;justify-content:center;font-size:17px}
   .captureTop{display:flex;align-items:center;gap:10px;margin-top:4px}
   .brandMark{width:28px;height:28px;border-radius:9px;background:var(--ink);display:flex;align-items:center;justify-content:center;color:var(--gold2);font-size:14px;flex:none}
-  .captureHero{margin-top:14px;background:linear-gradient(180deg,#fffaf0,#f4ead7);border:1.5px solid #eadfca;border-radius:20px;padding:16px 16px 15px;box-shadow:0 18px 44px -36px rgba(80,55,18,.45)}
-  .captureHero h1{font-size:34px;line-height:.95;letter-spacing:0;margin-top:8px}
+  .captureHero{margin-top:12px;background:#ffffff;border:1.5px solid #dde3da;border-radius:14px;padding:14px}
+  .captureHero h1{font-size:25px;line-height:1.04;letter-spacing:0;margin-top:7px}
+  .flowRail{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:12px}
+  .flowStep{border:1px solid #dce2da;background:#ffffff;border-radius:10px;padding:7px 5px 8px;min-width:0;text-align:center}
+  .flowStep b{display:block;font:800 9px/1 var(--mono);letter-spacing:0;color:#8a8273;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .flowStep span{display:block;width:7px;height:7px;border-radius:50%;background:#d8cdb8;margin:0 auto 5px}
+  .flowStep.active{border-color:#c6912f;background:#fff6e3}
+  .flowStep.active b{color:#6f430b}
+  .flowStep.done{border-color:#bfdcc6;background:#edf7ef}
+  .flowStep.done span{background:var(--green)}
+  .flowStep.active span{background:var(--gold)}
+  #phone.dark .flowStep{background:rgba(255,255,255,.03);border-color:#2a2620}
+  #phone.dark .flowStep b{color:#8c8475}
+  #phone.dark .flowStep.active{border-color:#4b6b52;background:rgba(79,208,140,.08)}
+  #phone.dark .flowStep.active span{background:#4fd08c}
+  #phone.dark .flowStep.done{border-color:#2f6f4c;background:rgba(79,208,140,.05)}
+  .boundaryRule{margin-top:7px;border:1px dashed #c8d0c8;border-radius:9px;padding:7px 9px;font:700 9px/1.35 var(--mono);color:#647066;background:rgba(255,255,255,.48);text-align:center}
+  #phone.dark .boundaryRule{border-color:#2f3a32;background:rgba(255,255,255,.025);color:#7e8a80}
+  .lessonGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+  .lessonBox{border:1px solid #dce2da;background:#ffffff;border-radius:12px;padding:10px;min-height:62px}
+  .lessonBox:first-child{border-left:3px solid var(--blue)}
+  .lessonBox.good{border-left:3px solid var(--green)}
+  .lessonBox b{display:block;font:800 9px var(--mono);letter-spacing:.04em;color:#a39a86;text-transform:uppercase}
+  .lessonBox span{display:block;font:600 12px/1.3 var(--sans);color:#3a352c;margin-top:5px}
+  .lessonBox.good span{color:var(--green)}
+  #phone.dark .lessonBox{background:rgba(255,255,255,.025);border-color:#2a2620}
+  #phone.dark .lessonBox b{color:#7e8a80}
+  #phone.dark .lessonBox span{color:#cfd6cd}
+  .stateBrief{border:1px solid #dce2da;background:#ffffff;border-radius:12px;padding:11px 12px;margin-top:10px}
+  .stateBrief b{display:block;font:800 10px var(--mono);letter-spacing:.04em;color:#a39a86;text-transform:uppercase}
+  .stateBrief span{display:block;font:500 13px/1.45 var(--sans);color:#4f493f;margin-top:5px}
+  #phone.dark .stateBrief{background:rgba(255,255,255,.025);border-color:#2a2620}
+  #phone.dark .stateBrief b{color:#7e8a80}
+  #phone.dark .stateBrief span{color:#cfd6cd}
+  .stepTitle{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  .stepTitle h1{font-size:25px;line-height:1.05}
+  .statusDot{display:inline-flex;align-items:center;gap:6px;font:800 10px var(--mono);border:1px solid;border-radius:999px;padding:5px 8px;white-space:nowrap}
+  .statusDot:before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
   .sinkLine{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:13px;border-top:1px solid #eadfca;padding-top:11px}
   .sinkBadges{display:flex;align-items:center;gap:5px;flex:none}
   .sinkState{font:700 10px var(--mono);letter-spacing:0;border-radius:999px;padding:5px 8px;border:1px solid}
@@ -126,6 +162,18 @@ function clock(ampm){
   return ampm ? `${h}:${m} ${ap}` : `${h}:${m}`;
 }
 
+function flowHtml(active){
+  const order=['capturing','scrubbing','gated','record','flush','delivered'];
+  const labels={capturing:'Capture',scrubbing:'Scrub',gated:'Gate',record:'Record',flush:'Queue',delivered:'Deliver'};
+  const idx=order.indexOf(active);
+  return `<div class="flowRail">${order.map((key,i)=>`<div class="flowStep ${i<idx?'done':''} ${i===idx?'active':''}"><span></span><b>${labels[key]}</b></div>`).join('')}</div>
+    <div class="boundaryRule">Trust boundary: every path to Slack passes through Gate.</div>`;
+}
+
+function statusPill(label, ok){
+  return `<span class="statusDot" style="color:${ok?'var(--green)':'var(--amber)'};background:${ok?'#e6f0e7':'#f6ecd6'};border-color:${ok?'#bfdcc6':'#e3c98a'}">${esc(label)}</span>`;
+}
+
 // ---------- screens ----------
 const screens = {
  capturing(){ setDark(false);
@@ -138,11 +186,15 @@ const screens = {
    return `
    <div class="captureTop">
      <div class="brandMark">✈</div>
-     <div style="font:700 15px var(--sans);letter-spacing:0">New session</div>
-     <span class="pill" style="margin-left:auto;color:var(--amber);background:#f6ecd6;border:1px solid #e3c98a">local</span></div>
+     <div><div style="font:800 14px var(--sans);letter-spacing:0">Coach scribe</div><div class="mono" style="font-size:9px;color:#8a8273;margin-top:2px">synthetic demo · edge first</div></div>
+     <span class="pill" style="margin-left:auto;color:var(--amber);background:#f6ecd6;border:1px solid #e3c98a">LOCAL</span></div>
+   ${flowHtml('capturing')}
    <div class="captureHero">
-     <div class="mono" style="font-size:10px;color:#a39a86;letter-spacing:.08em">CAPTURE</div>
-     <h1>Dictate the session</h1>
+     <div class="stepTitle">
+       <div><div class="mono" style="font-size:10px;color:#a39a86;letter-spacing:.08em">STEP 1</div><h1>Capture the note</h1></div>
+       ${statusPill('edge',true)}
+     </div>
+     <div class="sub" style="margin-top:7px">Raw text stays on the phone/laptop edge. The demo only asks you to decide what should happen next.</div>
      <button class="micbtn ${S.listening?'listening':''}" data-act="dictate" style="margin-top:13px">
        <span class="micorb">${S.listening?'■':'🎙'}</span><span>${dictLabel}</span>
      </button>
@@ -155,7 +207,11 @@ const screens = {
      </div>
      <div class="mono" style="margin-top:7px;font-size:9px;color:#a39a86;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(slackRoute)}</div>
    </div>
-   <textarea id="noteInput" class="note" style="margin-top:12px" placeholder="Session note appears here…" oninput="handleNoteInput(this.value)">${esc(S.note)}</textarea>
+   <div class="lessonGrid">
+     <div class="lessonBox"><b>Input</b><span>voice or typed session note</span></div>
+     <div class="lessonBox good"><b>Boundary</b><span>raw PHI cannot egress</span></div>
+   </div>
+   <textarea id="noteInput" class="note" style="margin-top:10px" placeholder="Session note appears here…" oninput="handleNoteInput(this.value)">${esc(S.note)}</textarea>
    <div class="noteMeta">
      <button data-act="sample" class="sampleBtn">Use sample note</button>
      <span id="wordCount" class="mono" style="font-size:10px;color:#8a8273">${S.note.trim()?S.note.trim().split(/\s+/).length:0} words</span></div>
@@ -165,7 +221,9 @@ const screens = {
  scrubbing(){ setDark(true,false);
    // error state
    if(S.error){ return `
+     ${flowHtml('scrubbing')}
      <div style="font:700 18px var(--sans);color:#f3eee2">Couldn't scrub</div>
+     <div class="stateBrief"><b>Where this failed</b><span>The edge server was reachable enough to show the UI, but the scrubber/model path did not return a clean record.</span></div>
      <div class="dbox" style="margin-top:15px;padding:16px;border-color:#5c2e27;color:#cdb1a8;font:400 13.5px/1.6 var(--sans)">
        ${esc(S.error)}
        <div class="mono" style="font-size:11px;color:#8c8475;margin-top:12px">The model server must be running on the laptop:<br>./scripts/serve-model.sh</div></div>
@@ -175,10 +233,12 @@ const screens = {
    const r = S.result;
    // loading state — the REAL note, under the sweep
    if(!r){ return `
-     <div style="font:700 18px var(--sans);color:#f3eee2;letter-spacing:-.01em">Scrubbing</div>
-     <div style="display:flex;align-items:center;gap:8px;margin-top:9px">
-       <span class="mono" style="font-size:11px;color:#8c8475">rules ∪ Bonsai 1.7B</span>
-       <span class="pill" style="color:#9bd9b3;border:1px solid #2c4a38;background:rgba(54,194,129,.08)">ON-DEVICE</span></div>
+     ${flowHtml('scrubbing')}
+     <div class="stepTitle" style="margin-top:13px">
+       <div><div class="mono" style="font-size:10px;color:#7e8a80;letter-spacing:.08em">STEP 2</div><h1 style="color:#f3eee2">Scrub locally</h1></div>
+       <span class="statusDot" style="color:#9bd9b3;border-color:#2c4a38;background:rgba(54,194,129,.08)">on-device</span>
+     </div>
+     <div class="stateBrief"><b>Active workload</b><span>Rules and Bonsai produce structured JSON; nothing can be sent until the verifier gate re-scans it.</span></div>
      <div class="dbox" style="position:relative;flex:1;margin-top:15px;padding:16px;overflow:hidden;font:400 14px/1.8 var(--sans);color:#6f685b">
        <div class="swband"></div>${esc(S.note)}</div>
      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;border-top:1px solid #2a2620;padding-top:14px">
@@ -187,8 +247,12 @@ const screens = {
    // result — the REAL scrubbed text + the categories caught
    const ents=[...new Set(r.redactions.map(x=>x.entity))];
    return `
-   <div style="font:700 18px var(--sans);color:#f3eee2;letter-spacing:-.01em">Caught ${r.redactions.length}</div>
-   <div class="mono" style="font-size:11px;color:#8c8475;margin-top:9px">rules ∪ Bonsai 1.7B · on device</div>
+   ${flowHtml('scrubbing')}
+   <div class="stepTitle" style="margin-top:13px">
+     <div><div class="mono" style="font-size:10px;color:#7e8a80;letter-spacing:.08em">SCRUB RESULT</div><h1 style="color:#f3eee2">Caught ${r.redactions.length}</h1></div>
+     <span class="statusDot" style="color:#9bd9b3;border-color:#2c4a38;background:rgba(54,194,129,.08)">local</span>
+   </div>
+   <div class="stateBrief"><b>Output candidate</b><span>This is still inside the edge boundary. It becomes eligible for egress only after residual identifiers are zero.</span></div>
    <div class="dbox" style="flex:1;margin-top:15px;padding:16px;overflow:auto;font:400 14px/1.9 var(--sans);color:#cfc7b6">${esc(r.scrubbed_text)}</div>
    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">
      ${ents.slice(0,6).map(e=>`<span style="font:700 9px var(--mono);color:#f3927f;background:rgba(191,59,43,.16);border:1px solid #5c2e27;border-radius:5px;padding:4px 7px">${esc(e)}</span>`).join('')}</div>
@@ -199,8 +263,12 @@ const screens = {
    const r=S.result; const pass = r.gate_pass; const resid = r.residual_count;
    const ents=[...new Set(r.redactions.map(x=>x.entity))].slice(0,5);
    return `
-   <div style="font:700 18px var(--sans);color:#eef4ee;letter-spacing:-.01em">Verifier gate</div>
-   <div class="mono" style="font-size:11px;color:#7e8a80;margin-top:9px;letter-spacing:.02em">re-scan · default-deny egress</div>
+   ${flowHtml('gated')}
+   <div class="stepTitle" style="margin-top:13px">
+     <div><div class="mono" style="font-size:10px;color:#7e8a80;letter-spacing:.08em">STEP 3</div><h1 style="color:#eef4ee">Verify egress</h1></div>
+     <span class="statusDot" style="color:${pass?'#9bd9b3':'#f3927f'};border-color:${pass?'#2c4a38':'#5c2e27'};background:${pass?'rgba(54,194,129,.08)':'rgba(191,59,43,.10)'}">${pass?'pass':'block'}</span>
+   </div>
+   <div class="stateBrief"><b>Decision rule</b><span>Default deny. Slack and trajectory storage stay locked unless the re-scan finds zero residual identifiers.</span></div>
    <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px" class="mono">
      ${ents.map(e=>`<div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;color:#bfc8be">
         <span>${esc(e)}</span><span style="color:#4fd08c;display:flex;align-items:center;gap:6px">removed
@@ -226,9 +294,11 @@ const screens = {
    const risks=(rec.risk_flags||[]);
    const signal=(rec.autonomy_delta&&rec.autonomy_delta.signals||[]).join(' · ');
    return `
+   ${flowHtml('record')}
    <div style="display:flex;align-items:center;justify-content:space-between">
      <div style="font:700 17px var(--sans);letter-spacing:-.01em">Care record</div>
      <span class="pill" style="color:var(--green);background:#e6f0e7;border:1px solid #bfdcc6">✓ CLEAN</span></div>
+   <div class="stateBrief"><b>Structured output</b><span>This is the first artifact allowed to leave the edge: pseudonymized, schema-shaped, and gate-clean.</span></div>
    <div style="flex:1;min-height:0;margin-top:14px;background:var(--card);border:1.5px solid var(--line);border-radius:18px;padding:16px;overflow:auto">
      <div class="mono" style="font-size:10px;color:#a39a86;letter-spacing:.05em">CLIENT_PSEUDONYM</div>
      <div class="mono" style="font:700 19px var(--mono);margin-top:6px">${esc(rec.client_pseudonym||'CLIENT-—')}</div>
@@ -255,7 +325,12 @@ const screens = {
    <button class="btn" data-act="send" style="margin-top:11px">Send to #coach-records</button>`; },
 
  flush(){ setDark(true,true); return `
-   <div style="font:700 18px var(--sans);color:#eef4ee;letter-spacing:-.01em">Sending to Slack</div>
+   ${flowHtml('flush')}
+   <div class="stepTitle" style="margin-top:13px">
+     <div><div class="mono" style="font-size:10px;color:#7e8a80;letter-spacing:.08em">STEP 4</div><h1 style="color:#eef4ee">Send clean record</h1></div>
+     <span class="statusDot" style="color:#9bd9b3;border-color:#2c4a38;background:rgba(54,194,129,.08)">queued</span>
+   </div>
+   <div class="stateBrief"><b>Network behavior</b><span>The phone can drop and reconnect. The clean record stays queued locally until Slack acknowledges.</span></div>
    ${ '' }
    <div style="display:flex;align-items:center;justify-content:space-between;border:1px solid #243029;background:rgba(255,255,255,.02);border-radius:14px;padding:12px 14px;margin-top:15px">
      <div style="display:flex;align-items:center;gap:10px"><span style="color:#8c8475;font-size:15px">→</span><span style="font:600 13px var(--sans);color:#cfd6cd">Slack sink</span></div>
@@ -276,6 +351,8 @@ const screens = {
 	   const title=S.posted?'Posted':(S.sendQueued?'Queued':'Not posted');
 	   const detail=S.posted?'Clean record landed in<br><span class="mono" style="font-weight:700;color:var(--ink)">#coach-records</span>':esc(S.sendNote||'Set SLACK_WEBHOOK_URL or SLACK_BOT_TOKEN to post for real');
 	   return `
+     ${flowHtml('delivered')}
+     <div class="stateBrief"><b>Demo claim</b><span>Only the clean record can cross the network boundary. Raw note and redaction map remain local.</span></div>
 	   <div class="grow center" style="gap:18px">
 	     <div style="width:62px;height:62px;border-radius:50%;background:${S.posted?'var(--green)':'#e3c98a'};display:flex;align-items:center;justify-content:center;color:#fff;font-size:30px;box-shadow:0 14px 30px -10px rgba(31,122,77,.4)">${S.posted?'✓':'✈'}</div>
 	     <div><h1 style="font-size:30px">${title}</h1>
@@ -294,12 +371,16 @@ const screens = {
 
  pack(){ setDark(false);
    if(S.packError){ return `
+     ${flowHtml('delivered')}
      <div style="font:700 17px var(--sans)">Pack reveal</div>
+     <div class="stateBrief"><b>Extension path</b><span>A pack changes recognizers, schema, policy, sink, and eval without changing core code.</span></div>
      <div style="margin-top:14px;background:#fff1ed;border:1.5px solid #e5b2a8;border-radius:16px;padding:15px;color:#884035;font:500 13px/1.55 var(--sans)">${esc(S.packError)}</div>
      <div class="grow"></div>
      <button class="btn" data-act="packRetry">Retry</button>`; }
    if(!S.packDemo){ return `
+     ${flowHtml('delivered')}
      <div style="font:700 17px var(--sans)">Pack reveal</div>
+     <div class="stateBrief"><b>Extension path</b><span>Loading the five declarative files that make the workload portable.</span></div>
      <div class="grow center" style="gap:14px">
        <div style="width:52px;height:52px;border-radius:15px;border:2px solid #e3c98a;display:flex;align-items:center;justify-content:center;color:var(--gold);font:700 18px var(--mono)">5</div>
        <div class="sub">Opening the five-file pack and staging one recognizer.</div>
@@ -309,9 +390,11 @@ const screens = {
    const caught=(d.after_redactions||[]).find(r=>r.entity==='BENEFIT_ID');
    const files=d.pack_files||[];
    return `
+   ${flowHtml('delivered')}
    <div style="display:flex;align-items:center;justify-content:space-between">
      <div style="font:700 17px var(--sans);letter-spacing:-.01em">Pack reveal</div>
      <span class="pill" style="color:var(--green);background:#e6f0e7;border:1px solid #bfdcc6">NO FORK</span></div>
+   <div class="stateBrief"><b>What changes</b><span>The workload is adapted by data files, while the verifier and trust boundary stay owned by the core.</span></div>
    <div style="margin-top:12px;display:flex;gap:7px;flex-wrap:wrap">
      ${(d.gates||[]).map(g=>`<span class="pill" style="color:${g.pass?'var(--green)':'var(--red)'};background:${g.pass?'#e6f0e7':'#fff1ed'};border:1px solid ${g.pass?'#bfdcc6':'#e5b2a8'}">${g.pass?'✓':'×'} ${esc(g.name)}</span>`).join('')}</div>
    <div style="flex:1;min-height:0;margin-top:12px;overflow:auto;display:flex;flex-direction:column;gap:10px">
