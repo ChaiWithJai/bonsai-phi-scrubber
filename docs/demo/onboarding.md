@@ -120,6 +120,14 @@ Use this when you want the channel to come from `packs/coach-session/sink.yaml` 
 
 The Slack endpoint re-runs the verifier gate over the outgoing de-identified record before posting. A residual identifier blocks the send before Slack credentials are used. Without a webhook or bot token, the demo still runs and the delivered screen explains which credential to set.
 
+Preflight the current sink before the demo:
+
+```bash
+curl http://localhost:8088/api/status | jq .slack
+```
+
+Expect `"configured": true` and route `webhook` or `bot_token` for a real Slack post. If the route is `preview`, the UI will still run but the clean card will not leave the app.
+
 ## Warnings
 
 - **Do NOT put the phone in REAL airplane mode.** That drops Wi-Fi/hotspot and the phone can't reach the Mac. The **"Airplane mode" toggle IN THE APP** is the demo control — that's the one you flip.

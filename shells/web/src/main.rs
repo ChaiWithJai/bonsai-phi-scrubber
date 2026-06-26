@@ -358,6 +358,30 @@ fn slack_bot_token(config: &SinkConfig) -> Option<String> {
         .or_else(|| keychain_secret(config.credentials.keychain_ref()))
 }
 
+fn slack_status() -> Value {
+    let config = match load_sink_config() {
+        Ok(c) => c,
+        Err(e) => return json!({"configured": false, "route": "unavailable", "error": format!("{e:#}")}),
+    };
+    let channel = slack_channel(&config);
+    if std::env::var("SLACK_WEBHOOK_URL")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .is_some()
+    {
+        return json!({"configured": true, "route": "webhook", "channel": channel});
+    }
+    if slack_bot_token(&config).is_some() {
+        return json!({"configured": true, "route": "bot_token", "channel": channel});
+    }
+    json!({
+        "configured": false,
+        "route": "preview",
+        "channel": channel,
+        "error": "set SLACK_WEBHOOK_URL or SLACK_BOT_TOKEN"
+    })
+}
+
 fn slack_blocks(record: &Value) -> Value {
     let pseud = record["client_pseudonym"].as_str().unwrap_or("CLIENT");
     let themes = record["themes"]
@@ -649,6 +673,11 @@ fn main() -> Result<()> {
                     tiny_http::Response::from_string(r#"{"ok":true}"#).with_header(json_header),
                 );
             }
+            ("GET", "/api/status") => {
+                let payload = json!({"ok": true, "slack": slack_status()}).to_string();
+                let _ =
+                    req.respond(tiny_http::Response::from_string(payload).with_header(json_header));
+            }
             ("GET", "/favicon.ico") => {
                 let _ = req.respond(tiny_http::Response::empty(204));
             }
@@ -758,6 +787,14 @@ credentials:
         .unwrap();
         assert_eq!(slack_channel(&sink), "#coach-records");
         assert_eq!(sink.credentials.keychain_ref(), "slack-bot-token");
+    }
+
+    #[test]
+    fn slack_status_reports_preview_when_unconfigured() {
+        let status = slack_status();
+        assert_eq!(status["configured"], false, "{status}");
+        assert_eq!(status["route"], "preview", "{status}");
+        assert_eq!(status["channel"], "#coach-records", "{status}");
     }
 
     #[test]
