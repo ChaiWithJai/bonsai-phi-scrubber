@@ -2,6 +2,13 @@
 
 Run the on-device PHI-scrub demo on a phone in about five minutes: a clean web shell over the Rust `airplane-core`, with all the model work happening locally on your Mac.
 
+This runbook is written for the adopter path: prove the workflow with synthetic
+data, understand the safety boundary, then change the pack for your own workflow.
+If you are here to extend the inference runtime or the iOS adapter, start with
+[`../ios-shell-scaffold.md`](../ios-shell-scaffold.md) and
+[`../positioning/cncf-end-user-and-inference-ecosystem.md`](../positioning/cncf-end-user-and-inference-ecosystem.md)
+after you have seen the demo run once.
+
 For architecture, network topology, and data-flow diagrams, see
 [`docs/demo/system-network-data-flows.md`](system-network-data-flows.md).
 For a narrative walkthrough, verification guide, workload profile, and worked examples,

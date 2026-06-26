@@ -30,6 +30,11 @@ tools before they are scrubbed. For builders, the point is the reference
 architecture: model-as-port, deterministic harness, verifier gate, and
 declarative packs.
 
+This repo keeps those two registers separate. The runbook and pack workflow are
+written for CNCF-style end users who need a safe adoption path. The architecture,
+ports, and iOS simulator backend selector are written for builders who want to
+extend the inference path.
+
 ## Who Should Use This
 
 Use this if you are:
@@ -344,6 +349,7 @@ real iPhone 11 hardware proof.
 | `docs/extending.md` | Pack extension walkthrough. |
 | `docs/demo/how-the-demo-works.md` | Architecture, topology, workload profile, worked examples. |
 | `docs/positioning/cncf-end-user-and-inference-ecosystem.md` | Audience split: adopter outcome language vs. builder mechanism language. |
+| `docs/positioning/prismml-partner-brief.md` | Respectful partner-facing brief for how Airplane Mode can help Bonsai adoption. |
 | `AGENTS.md` | Harnessed build loop and hard rules. |
 | `CANON.md` | Design canon index. |
 
