@@ -131,6 +131,8 @@
   .backendBtn span{display:block;font:700 9px/1.25 var(--mono);color:#8a8273;margin-top:4px}
   .backendBtn.active{border-color:#c6912f;background:#fff6e3}
   .backendBtn.active strong{color:#6f430b}
+  .backendTools{display:flex;align-items:center;gap:7px;margin-top:8px;flex-wrap:wrap}
+  .miniBtn{font:800 9px var(--mono);color:#245b8f;background:#edf4fb;border:1px solid #c9d9e7;border-radius:999px;padding:6px 8px;cursor:pointer}
   .sampleBtn{font:700 12px var(--sans);color:var(--gold);background:#f6ecd6;border:1px solid #e3c98a;border-radius:999px;padding:8px 11px;cursor:pointer}
   .noteMeta{display:flex;align-items:center;justify-content:space-between;margin-top:10px}
   .btn.disabled{background:#d9d0bd;color:#8a8273;cursor:default;box-shadow:none}
@@ -163,8 +165,11 @@ const STEPS = new Set(['capturing','scrubbing','gated','record','flush','deliver
 const RESULT_STEPS = new Set(['gated','record','flush','delivered','pack']);
 const DRAFT_KEY = 'airplane-demo-draft-v2';
 const OUTBOX_KEY = 'airplane-demo-send-outbox-v1';
-const S = { screen:'capturing', note:'', result:null, error:null, posted:false, sendNote:'', sendQueued:false, trajectoryCount:0, trajectoryNote:'', packDemo:null, packError:null, listening:false, speechMsg:'', status:null, job:null, capability:null, backend:'mac-edge', backendNote:'' };
+const S = { screen:'capturing', note:'', result:null, error:null, posted:false, sendNote:'', sendQueued:false, trajectoryCount:0, trajectoryNote:'', packDemo:null, packError:null, listening:false, speechMsg:'', status:null, job:null, capability:null, backend:'mac-edge', backendNote:'', browserModel:{status:'idle',detail:'not loaded',model:'onnx-community/Bonsai-1.7B-ONNX',elapsed_ms:0,tokens:0,tps:0,output_preview:''} };
 let recognizer = null;
+let browserWorker = null;
+let browserWorkerPending = null;
+let browserModelReady = false;
 
 const $phone = document.getElementById('phone');
 const $screen = document.getElementById('screen');
@@ -217,8 +222,9 @@ function backendHtml(){
   const gpuReady = !!(S.capability && S.capability.webgpu);
   const active = S.backend || 'mac-edge';
   const gpuState = gpuReady ? 'capable · adapter next' : 'needs HTTPS/WebGPU';
+  const bm = S.browserModel || {};
   const note = active === 'browser-gpu'
-    ? 'Browser GPU is selected. Today this records the capability gap and fails closed to the Mac-edge verifier until the local Bonsai adapter is wired.'
+    ? 'Browser GPU is selected. The phone attempts local Bonsai q1 span generation, then the Mac-edge verifier remains the egress gate until the span contract is integrated.'
     : 'Mac edge is the live path: local Bonsai via llama-server, Rust gate, Slack sink.';
   return `<div class="backendChoice">
     <b>Backend path</b>
@@ -231,6 +237,10 @@ function backendHtml(){
       </button>
     </div>
     <div class="mono" style="font-size:9px;line-height:1.35;color:#736c5d;margin-top:8px">${esc(note)}</div>
+    ${active==='browser-gpu'?`<div class="backendTools">
+      <button class="miniBtn" data-act="warmBrowser">Warm Bonsai q1</button>
+      <span class="mono" style="font-size:9px;color:#736c5d">${esc(bm.status||'idle')} · ${esc(bm.detail||'not loaded')}</span>
+    </div>`:''}
     ${S.backendNote?`<div class="mono" style="font-size:9px;line-height:1.35;color:var(--amber);margin-top:6px">${esc(S.backendNote)}</div>`:''}
   </div>`;
 }
@@ -517,7 +527,8 @@ function saveDraft(){
       trajectoryCount:S.trajectoryCount,
       trajectoryNote:S.trajectoryNote,
       backend:S.backend,
-      backendNote:S.backendNote
+      backendNote:S.backendNote,
+      browserModel:S.browserModel
     }));
   }catch(_){}
 }
@@ -536,6 +547,7 @@ function loadDraft(){
     S.trajectoryNote=d.trajectoryNote||'';
     S.backend=d.backend||'mac-edge';
     S.backendNote=d.backendNote||'';
+    S.browserModel=d.browserModel||S.browserModel;
   }catch(_){}
 }
 
@@ -674,6 +686,7 @@ function render(){
 async function onAct(e){
   const act = e.currentTarget.getAttribute('data-act');
   if(act==='backend') return selectBackend(e.currentTarget.getAttribute('data-backend'));
+  if(act==='warmBrowser') return warmBrowserModel();
   if(act==='dictate') return toggleDictation();
   if(act==='sample'){ S.note=NOTE; S.speechMsg='sample loaded'; saveDraft(); return render(); }
   if(act==='scrub'){
@@ -697,6 +710,108 @@ function selectBackend(name){
   S.backendNote = '';
   saveDraft();
   render();
+}
+
+function browserModelStatus(status, detail, extra={}){
+  S.browserModel = Object.assign({}, S.browserModel, {
+    status,
+    detail: detail || S.browserModel.detail || '',
+    elapsed_ms: extra.elapsed_ms || S.browserModel.elapsed_ms || 0,
+    tokens: extra.tokens || S.browserModel.tokens || 0,
+    tps: extra.tps || S.browserModel.tps || 0,
+    output_preview: extra.output_preview || S.browserModel.output_preview || '',
+    model: extra.model || S.browserModel.model || 'onnx-community/Bonsai-1.7B-ONNX'
+  });
+  if(S.capability) S.capability.browser_model = S.browserModel;
+  saveDraft();
+  if(S.screen==='capturing' || S.screen==='scrubbing') render();
+  postClientCapability();
+}
+
+function browserWorkerHandleMessage(msg){
+  const data = msg.data || {};
+  if(data.status === 'progress'){
+    const pct = data.total ? Math.round((data.loaded / data.total) * 100) : Math.round(data.progress || 0);
+    browserModelStatus('loading', `download ${pct}%`);
+  } else if(data.status === 'loading'){
+    browserModelStatus('loading', data.detail || 'loading model');
+  } else if(data.status === 'ready' || data.status === 'checked'){
+    browserModelReady = data.status === 'ready' || browserModelReady;
+    browserModelStatus(data.status === 'ready' ? 'ready' : 'checked', data.model || 'WebGPU available', {model:data.model});
+  } else if(data.status === 'start'){
+    browserModelStatus('generating', data.detail || 'generating spans');
+  } else if(data.status === 'update'){
+    browserModelStatus('generating', `${data.numTokens||0} tokens`, {tokens:data.numTokens||0,tps:data.tps||0,output_preview:data.output||''});
+  } else if(data.status === 'complete'){
+    browserModelReady = true;
+    browserModelStatus('complete', 'browser span output ready', {tokens:data.numTokens||0,tps:data.tps||0,output_preview:data.output||'',model:data.model});
+  } else if(data.status === 'error'){
+    browserModelStatus('error', data.detail || data.data || 'browser model failed');
+  }
+  if(browserWorkerPending && browserWorkerPending.done.has(data.status)){
+    const pending = browserWorkerPending;
+    browserWorkerPending = null;
+    clearTimeout(pending.timer);
+    pending.resolve(data);
+  }
+}
+
+function ensureBrowserWorker(){
+  if(browserWorker) return browserWorker;
+  browserWorker = new Worker('/bonsai-worker.js', {type:'module'});
+  browserWorker.onmessage = browserWorkerHandleMessage;
+  browserWorker.onerror = (err)=> {
+    browserModelStatus('error', err.message || 'worker error');
+    if(browserWorkerPending){
+      const pending = browserWorkerPending;
+      browserWorkerPending = null;
+      clearTimeout(pending.timer);
+      pending.resolve({status:'error',detail:err.message||'worker error'});
+    }
+  };
+  return browserWorker;
+}
+
+function workerRequest(type, payload={}, done=['ready','error'], timeoutMs=120000){
+  if(browserWorkerPending) return Promise.resolve({status:'error', detail:'browser worker already busy'});
+  const worker = ensureBrowserWorker();
+  return new Promise(resolve=>{
+    const timer = setTimeout(()=>{
+      const pending = browserWorkerPending;
+      browserWorkerPending = null;
+      try{ worker.postMessage({type:'interrupt'}); }catch(_){}
+      if(pending) pending.resolve({status:'timeout', detail:`${type} timed out after ${Math.round(timeoutMs/1000)}s`});
+    }, timeoutMs);
+    browserWorkerPending = {resolve, timer, done:new Set(done.concat(['error']))};
+    worker.postMessage(Object.assign({type}, payload));
+  });
+}
+
+async function warmBrowserModel(){
+  if(!window.isSecureContext || !navigator.gpu){
+    browserModelStatus('error', window.isSecureContext ? 'navigator.gpu unavailable' : 'HTTPS required for WebGPU');
+    return;
+  }
+  const started = performance.now();
+  browserModelStatus('loading','starting Bonsai q1');
+  const out = await workerRequest('load', {}, ['ready','error'], 120000);
+  browserModelStatus(out.status === 'ready' ? 'ready' : 'error', out.detail || out.model || out.status, {elapsed_ms:Math.round(performance.now()-started), model:out.model});
+}
+
+async function runBrowserGpuSpanProbe(text){
+  if(!window.isSecureContext || !navigator.gpu){
+    return {ok:false, detail: window.isSecureContext ? 'navigator.gpu unavailable' : 'HTTPS required for WebGPU'};
+  }
+  const started = performance.now();
+  if(!browserModelReady){
+    const loaded = await workerRequest('load', {}, ['ready','error'], 120000);
+    if(loaded.status !== 'ready') return {ok:false, detail:loaded.detail || loaded.status, elapsed_ms:Math.round(performance.now()-started)};
+  }
+  const generated = await workerRequest('generate-spans', {text}, ['complete','error'], 60000);
+  const elapsed = Math.round(performance.now()-started);
+  if(generated.status !== 'complete') return {ok:false, detail:generated.detail || generated.status, elapsed_ms:elapsed};
+  browserModelStatus('complete','browser span output ready', {elapsed_ms:elapsed,tokens:generated.numTokens||0,tps:generated.tps||0,output_preview:generated.output||'',model:generated.model});
+  return {ok:true, detail:'browser-local Bonsai produced span candidates', elapsed_ms:elapsed, output:generated.output||''};
 }
 
 function noteInput(){
@@ -779,8 +894,15 @@ function toggleDictation(){
 async function doScrub(){
   S.result=null; S.error=null;
   if(S.backend === 'browser-gpu'){
-    S.backendNote = 'Browser GPU selected: local browser model adapter is not wired yet, so this run falls back to Mac-edge Bonsai and the same verifier gate.';
-    setJob('scrub','running','browser GPU gap recorded · falling back to Mac edge');
+    S.backendNote = 'Browser GPU selected: attempting local Bonsai q1 span generation; Mac-edge verifier remains the final egress gate.';
+    setJob('scrub','running','browser GPU span probe');
+    const probe = await runBrowserGpuSpanProbe(S.note);
+    if(probe.ok){
+      S.backendNote = `Browser GPU produced local span candidates in ${(probe.elapsed_ms/1000).toFixed(1)}s; Mac-edge verifier fallback finalizes the record until the span contract is integrated.`;
+    } else {
+      S.backendNote = `Browser GPU probe did not complete (${probe.detail}); falling back to Mac-edge Bonsai and verifier.`;
+    }
+    setJob('scrub','running','Mac-edge verifier fallback');
   } else {
     S.backendNote = '';
     setJob('scrub','running','rules union Bonsai');
@@ -857,6 +979,16 @@ function webglAvailable(kind){
   }catch(_){ return false; }
 }
 
+async function postClientCapability(){
+  if(!S.capability) return;
+  const cap = Object.assign({}, S.capability, {browser_model:S.browserModel});
+  try{
+    const res = await fetch('/api/client-capability',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cap)});
+    const data = await res.json().catch(()=>null);
+    if(data && data.ok && data.capability) S.capability = data.capability;
+  }catch(_){}
+}
+
 async function detectClientCapability(){
   const cap = {
     user_agent:navigator.userAgent || '',
@@ -866,6 +998,7 @@ async function detectClientCapability(){
     webgl:webglAvailable('webgl') || webglAvailable('experimental-webgl'),
     webgl2:webglAvailable('webgl2'),
     webgpu_error:'',
+    browser_model:S.browserModel,
     hardware_concurrency:navigator.hardwareConcurrency || 0,
     device_memory:navigator.deviceMemory || 0,
     screen:{width:screen.width||0,height:screen.height||0,dpr:devicePixelRatio||1}
@@ -886,11 +1019,7 @@ async function detectClientCapability(){
   }
   S.capability = cap;
   render();
-  try{
-    const res = await fetch('/api/client-capability',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cap)});
-    const data = await res.json().catch(()=>null);
-    if(data && data.ok && data.capability) S.capability = data.capability;
-  }catch(_){}
+  await postClientCapability();
   if(S.screen==='capturing') render();
 }
 

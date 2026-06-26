@@ -61,6 +61,11 @@ What we now have:
 - A browser capability endpoint: `POST /api/client-capability`.
 - A phone-visible capability panel in the demo UI.
 - A selectable web backend path: `Mac edge` or `Browser GPU`.
+- A local module worker at `/bonsai-worker.js` that mirrors the Hugging Face
+  Space's implementation: `@huggingface/transformers`, `device: "webgpu"`,
+  `dtype: "q1"`, `onnx-community/Bonsai-1.7B-ONNX`.
+- Browser model telemetry reported back through `/api/client-capability` and
+  visible in `/api/status`.
 - A validated external Bonsai WebGPU demo:
   <https://huggingface.co/spaces/webml-community/bonsai-webgpu>.
 - Documentation that the HF demo uses `onnx-community/Bonsai-1.7B-ONNX` through
@@ -68,10 +73,9 @@ What we now have:
 
 What we do not have yet:
 
-- Local browser inference inside our web shell. The UI can select `Browser GPU`,
-  but it honestly records the gap and falls back to Mac-edge Bonsai until the
-  adapter is wired.
-- A structured span contract running in browser GPU.
+- A measured successful local browser generation on Jai's phone from our own
+  web shell.
+- A structured browser span contract wired into the core response path.
 - Offline model caching proof.
 - A measured phone-local scrub on our synthetic coaching note.
 
@@ -102,6 +106,17 @@ The opportunity is immediate because:
 The next optimal move is to wrap that browser model path in our trust harness.
 The network move is equally important: no third-party tunnel for notes. Secure
 context should come from local HTTPS or an IT-managed private network.
+
+### Why This Is WebGPU, Not WebGL
+
+Jai said "WebGL" as shorthand for "browser GPU." The implementation truth is
+more specific: the working ecosystem path is **WebGPU**. The Hugging Face Bonsai
+Space uses Transformers.js with `device: "webgpu"` and q1 ONNX weights. WebGL is
+useful as a capability signal and legacy graphics/inference substrate, but it is
+not the path the Bonsai browser demo has validated for this LLM workload.
+
+So the product language can say "browser GPU" when speaking to end users. The
+engineering language should say "WebGPU" when specifying the adapter.
 
 ## Density Of Intelligence, Dogfooded
 
@@ -141,8 +156,13 @@ Implemented:
 - `/api/status` now includes `client_capability`
 - phone UI shows a Browser inference probe card
 - phone UI can select `Mac edge` or `Browser GPU`
-- selecting `Browser GPU` currently fails closed to Mac-edge Bonsai and displays
-  that truth in the scrub/record states
+- selecting `Browser GPU` attempts a local q1 Bonsai span-generation probe with
+  a bounded timeout, then fails closed to Mac-edge Bonsai and displays that
+  truth in the scrub/record states
+- the app serves `/bonsai-worker.js`, a no-build module worker based on the HF
+  Space's Transformers.js/WebGPU shape
+- model load/generation status is stored as sanitized browser telemetry, not raw
+  note telemetry
 - UI links to the HF Bonsai WebGPU Space
 
 Note: local LAN HTTP may not be a secure context on iPhone Safari. A phone can
@@ -172,6 +192,24 @@ path was profiled again:
 | `/api/scrub` with `backend: browser-gpu` | 13.60s, falls back to Mac-edge Bonsai, `gate_pass: true`, `residual_count: 0`, 4 redactions |
 | `/api/send` | 0.27s, Slack accepted |
 | `/api/trajectory` | 0.03s, gate-clean trajectory stored as `local-000006` |
+
+After wiring the real browser worker, the safety profile is:
+
+| Step | Bound |
+| --- | --- |
+| Browser q1 model load | 120s max, then interrupt/fallback |
+| Browser span generation | 60s max, then interrupt/fallback |
+| Raw note egress | first-party phone/laptop edge only; no public tunnel |
+| Slack egress | still verifier-gated; browser model output is never trusted raw |
+
+The live server was then reprofiled after the worker route was added:
+
+| Step | Result |
+| --- | --- |
+| `/bonsai-worker.js` | served the q1 WebGPU Bonsai worker from the local edge |
+| `/api/scrub` with `backend: browser-gpu` | 15.79s, `gate_pass: true`, `residual_count: 0`, 4 redactions |
+| `/api/send` | 0.27s, Slack accepted |
+| `/api/trajectory` | 0.04s, gate-clean trajectory stored as `local-000007` |
 
 The scrub result caught:
 
@@ -212,12 +250,12 @@ The selectable backend exists:
 Backend: Mac edge | Browser GPU spike
 ```
 
-The next build slice is to replace the honest fallback with a real browser
-adapter. Browser GPU mode should:
+The next build slice is to replace the probe/fallback boundary with a real
+browser span contract. Browser GPU mode already attempts to load and generate
+with Bonsai q1 in the browser. It still needs to:
 
-- load the Bonsai ONNX/WebGPU model in the browser;
-- return raw span JSON proposals;
-- send only span proposals and scrubbed candidates through the existing local
+- return validated raw span JSON proposals;
+- send only span proposals and scrubbed candidates through a new local
   gate path;
 - keep the same `scrubbed_text`, `redactions`, `gate_pass`, `residual_count`,
   `record` response shape.

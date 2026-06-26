@@ -21,6 +21,7 @@ use std::time::{Duration, Instant};
 const DEFAULT_PACK_DIR: &str = "packs/coach-session";
 const INDEX: &str = "shells/web/static/index.html";
 const GPU_PROBE: &str = "shells/web/static/gpu.html";
+const BONSAI_WORKER: &str = "shells/web/static/bonsai-worker.js";
 const DEFAULT_ADDR: &str = "0.0.0.0:8099";
 const PASSES: u32 = 5;
 const SLACK_WEBHOOK_KEYCHAIN_REF: &str = "slack-webhook-url";
@@ -487,6 +488,15 @@ fn sanitize_client_capability(input: &Value) -> Value {
         "webgl": input["webgl"].as_bool().unwrap_or(false),
         "webgl2": input["webgl2"].as_bool().unwrap_or(false),
         "webgpu_error": truncate("webgpu_error", 160),
+        "browser_model": {
+            "status": input["browser_model"]["status"].as_str().unwrap_or("idle").chars().take(32).collect::<String>(),
+            "detail": input["browser_model"]["detail"].as_str().unwrap_or("").chars().take(160).collect::<String>(),
+            "model": input["browser_model"]["model"].as_str().unwrap_or("").chars().take(96).collect::<String>(),
+            "elapsed_ms": input["browser_model"]["elapsed_ms"].as_u64().unwrap_or(0),
+            "tokens": input["browser_model"]["tokens"].as_u64().unwrap_or(0),
+            "tps": input["browser_model"]["tps"].as_f64().unwrap_or(0.0),
+            "output_preview": input["browser_model"]["output_preview"].as_str().unwrap_or("").chars().take(240).collect::<String>()
+        },
         "hardware_concurrency": input["hardware_concurrency"].as_u64().unwrap_or(0),
         "device_memory": input["device_memory"].as_f64().unwrap_or(0.0),
         "screen": {
@@ -610,9 +620,7 @@ fn slack_outbound_text(record: &Value) -> String {
     if !risks.is_empty() {
         parts.push(format!("Risk flags: {}", risks.join(" · ")));
     }
-    parts.push(
-        "scrubbed · gate-clean · autonomy signals only · no name, no member ID".to_string(),
-    );
+    parts.push("scrubbed · gate-clean · autonomy signals only · no name, no member ID".to_string());
     parts.join("\n")
 }
 
@@ -1015,6 +1023,11 @@ fn main() -> Result<()> {
         let html_header =
             tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"text/html; charset=utf-8"[..])
                 .unwrap();
+        let js_header = tiny_http::Header::from_bytes(
+            &b"Content-Type"[..],
+            &b"text/javascript; charset=utf-8"[..],
+        )
+        .unwrap();
 
         match (method.as_str(), path.as_str()) {
             ("GET", "/") => {
@@ -1028,6 +1041,12 @@ fn main() -> Result<()> {
                     .unwrap_or_else(|_| "<h1>gpu.html missing</h1>".into());
                 let _ =
                     req.respond(tiny_http::Response::from_string(html).with_header(html_header));
+            }
+            ("GET", "/bonsai-worker.js") => {
+                let js = std::fs::read_to_string(BONSAI_WORKER).unwrap_or_else(|_| {
+                    "postMessage({status:'error',detail:'worker missing'});".into()
+                });
+                let _ = req.respond(tiny_http::Response::from_string(js).with_header(js_header));
             }
             ("GET", "/api/health") => {
                 let _ = req.respond(
@@ -1277,6 +1296,15 @@ credentials:
             "webgpu": true,
             "webgl": true,
             "webgl2": true,
+            "browser_model": {
+                "status": "complete",
+                "detail": "x".repeat(400),
+                "model": "onnx-community/Bonsai-1.7B-ONNX",
+                "elapsed_ms": 1200,
+                "tokens": 42,
+                "tps": 3.5,
+                "output_preview": "y".repeat(400)
+            },
             "hardware_concurrency": 6,
             "device_memory": 4,
             "screen": {"width": 390, "height": 844, "dpr": 3}
@@ -1287,6 +1315,15 @@ credentials:
         assert_eq!(out["platform"], "iPhone");
         assert_eq!(out["screen"]["width"], 390);
         assert_eq!(out["user_agent"].as_str().unwrap().len(), 240);
+        assert_eq!(out["browser_model"]["status"], "complete");
+        assert_eq!(out["browser_model"]["detail"].as_str().unwrap().len(), 160);
+        assert_eq!(
+            out["browser_model"]["output_preview"]
+                .as_str()
+                .unwrap()
+                .len(),
+            240
+        );
     }
 
     #[test]
