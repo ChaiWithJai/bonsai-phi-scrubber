@@ -219,7 +219,10 @@ const STEPS = new Set(['capturing','scrubbing','gated','record','flush','deliver
 const RESULT_STEPS = new Set(['gated','record','flush','delivered','pack']);
 const DRAFT_KEY = 'airplane-demo-draft-v3';
 const OUTBOX_KEY = 'airplane-demo-send-outbox-v1';
-const DEFAULT_BACKEND = 'browser-gpu';
+const DEFAULT_BACKEND = '';
+const RUNTIME_CHOICE_VERSION = 2;
+const SCRUB_BROWSER_LOAD_TIMEOUT_MS = 15000;
+const SCRUB_BROWSER_GENERATE_TIMEOUT_MS = 20000;
 const S = { screen:'capturing', note:'', result:null, error:null, posted:false, sendNote:'', sendQueued:false, trajectoryCount:0, trajectoryNote:'', packDemo:null, packError:null, listening:false, speechMsg:'', status:null, job:null, capability:null, backend:DEFAULT_BACKEND, backendNote:'', browserModel:{status:'idle',detail:'not loaded',model:'onnx-community/Bonsai-1.7B-ONNX',elapsed_ms:0,tokens:0,tps:0,output_preview:''} };
 let recognizer = null;
 let browserWorker = null;
@@ -276,25 +279,27 @@ function capabilityHtml(){
 
 function backendHtml(){
   const gpuReady = !!(S.capability && S.capability.webgpu);
-  const active = S.backend || DEFAULT_BACKEND;
-  const gpuState = gpuReady ? 'capable · live probe' : 'falls back safely';
+  const active = S.backend || '';
+  const gpuState = gpuReady ? 'WebGPU exposed' : 'capability pending';
   const bm = S.browserModel || {};
-  const note = active === 'browser-gpu'
-    ? 'Browser GPU is the default: the phone tries local Bonsai span generation first, then the verifier gate decides whether any clean record can leave.'
-    : 'Mac edge keeps the same first-party boundary: local Bonsai via llama-server, Rust gate, Slack sink.';
+  const note = !active
+    ? 'Choose before scrubbing. Browser GPU downloads model artifacts into this browser; Mac edge skips that download and uses the laptop-local model server.'
+    : active === 'browser-gpu'
+      ? 'You chose Browser GPU. The phone/browser may download about 300 MB of local model artifacts, then tries phone-local span generation before the verifier gate.'
+      : 'You chose Mac edge. No browser model download; the note stays on your first-party local link and the laptop-local Bonsai server runs the scrub.';
   return `<div class="backendChoice">
-    <b>Backend path</b>
+    <b>Choose runtime path</b>
     <div class="backendBtns">
       <button class="backendBtn ${active==='mac-edge'?'active':''}" data-act="backend" data-backend="mac-edge">
-        <strong>Mac edge</strong><span>live · verifier gated</span>
+        <strong>Use Mac-edge backup</strong><span>reliable demo · no browser model download</span>
       </button>
       <button class="backendBtn ${active==='browser-gpu'?'active':''}" data-act="backend" data-backend="browser-gpu">
-        <strong>Browser GPU</strong><span>${esc(gpuState)}</span>
+        <strong>Try Browser GPU</strong><span>${esc(gpuState)} · downloads local model</span>
       </button>
     </div>
     <div class="mono" style="font-size:9px;line-height:1.35;color:#736c5d;margin-top:8px">${esc(note)}</div>
     ${active==='browser-gpu'?`<div class="backendTools">
-      <button class="miniBtn" data-act="warmBrowser">Warm Bonsai q1</button>
+      <button class="miniBtn" data-act="warmBrowser">Download / warm Bonsai q1</button>
       <span class="mono" style="font-size:9px;color:#736c5d">${esc(bm.status||'idle')} · ${esc(bm.detail||'not loaded')}</span>
     </div>`:''}
     ${S.backendNote?`<div class="mono" style="font-size:9px;line-height:1.35;color:var(--amber);margin-top:6px">${esc(S.backendNote)}</div>`:''}
@@ -344,11 +349,10 @@ function secureContextCalloutHtml(){
   </div>`;
 }
 
-function pathDisclosureHtml(){
+function capabilityDisclosureHtml(){
   return `<details class="disclosure">
-    <summary>Path and capability</summary>
+    <summary>Browser capability details</summary>
     <div class="disclosureBody" style="padding:0 0 10px">
-      ${backendHtml()}
       ${capabilityHtml()}
     </div>
   </details>`;
@@ -369,9 +373,9 @@ const screens = {
    <div class="captureHero">
      <div class="stepTitle">
        <div><div class="mono" style="font-size:10px;color:#a39a86;letter-spacing:.08em">STEP 1</div><h1>Capture a session note</h1></div>
-       ${statusPill(S.backend==='browser-gpu'?'GPU first':'edge',true)}
+       ${statusPill(S.backend ? (S.backend==='browser-gpu'?'GPU first':'edge') : 'choose path', !!S.backend)}
      </div>
-     <div class="sub" style="margin-top:6px">Browser GPU is the default attempt. If the phone cannot run it, the same first-party edge verifier handles the fallback.</div>
+     <div class="sub" style="margin-top:6px">First choose the runtime path: try phone/browser GPU with a local model download, or use the reliable Mac-edge backup.</div>
      <div class="edgeSummary">
        <div><b>Business boundary</b><span>Raw notes stay on phone/laptop or an IT-managed private network; Slack only gets gate-clean output.</span></div>
        <div class="edgeBadge">FIRST-PARTY</div>
@@ -379,6 +383,7 @@ const screens = {
    </div>
    <div class="captureStack">
      ${businessDisclosureHtml()}
+     ${backendHtml()}
      <div class="captureControls">
        <button class="micbtn ${S.listening?'listening':''}" data-act="dictate">
          <span class="micorb">${S.listening?'■':'🎙'}</span><span>${dictLabel}</span>
@@ -391,9 +396,9 @@ const screens = {
        <span id="captureMsg" style="color:${S.speechMsg?'var(--amber)':'#8a8273'}">${esc(S.speechMsg||'edge capture · verifier gated')}</span>
        <span id="wordCount">${S.note.trim()?S.note.trim().split(/\s+/).length:0} words</span>
      </div>
-     ${pathDisclosureHtml()}
+     ${capabilityDisclosureHtml()}
    </div>
-   <button class="btn ${hasNote?'':'disabled'}" data-act="scrub">${hasNote?'Scrub on device':'Waiting for note'}</button>`; },
+   <button class="btn ${hasNote && S.backend?'':'disabled'}" data-act="scrub">${!S.backend?'Choose runtime path':(hasNote?'Scrub on device':'Waiting for note')}</button>`; },
 
  scrubbing(){ setDark(true,false);
    // error state
@@ -631,6 +636,7 @@ function saveDraft(){
       trajectoryCount:S.trajectoryCount,
       trajectoryNote:S.trajectoryNote,
       backend:S.backend,
+      runtimeChoiceVersion:RUNTIME_CHOICE_VERSION,
       backendNote:S.backendNote,
       browserModel:S.browserModel
     }));
@@ -649,8 +655,8 @@ function loadDraft(){
     S.sendQueued=!!d.sendQueued;
     S.trajectoryCount=d.trajectoryCount||0;
     S.trajectoryNote=d.trajectoryNote||'';
-    S.backend=d.backend||DEFAULT_BACKEND;
-    S.backendNote=d.backendNote||'';
+    S.backend=d.runtimeChoiceVersion === RUNTIME_CHOICE_VERSION ? (d.backend||DEFAULT_BACKEND) : DEFAULT_BACKEND;
+    S.backendNote=d.runtimeChoiceVersion === RUNTIME_CHOICE_VERSION ? (d.backendNote||'') : '';
     S.browserModel=d.browserModel||S.browserModel;
   }catch(_){}
 }
@@ -794,6 +800,12 @@ async function onAct(e){
   if(act==='dictate') return toggleDictation();
   if(act==='sample'){ S.note=NOTE; S.speechMsg='sample loaded'; saveDraft(); return render(); }
   if(act==='scrub'){
+    if(!S.backend){
+      S.speechMsg='choose Browser GPU or Mac-edge backup first';
+      saveDraft();
+      render();
+      return;
+    }
     if(e.currentTarget.classList.contains('disabled')){ focusNote(); return; }
     if(!S.note.trim()){ alert('Dictate or type a note first — or tap “Use a sample note”.'); return; }
     go('scrubbing'); return doScrub();
@@ -811,7 +823,10 @@ async function onAct(e){
 
 function selectBackend(name){
   S.backend = name === 'browser-gpu' ? 'browser-gpu' : 'mac-edge';
-  S.backendNote = '';
+  S.backendNote = S.backend === 'browser-gpu'
+    ? 'Browser GPU selected. This may download local model artifacts into the browser before falling back if needed.'
+    : 'Mac-edge backup selected. This skips the browser model download and uses the laptop-local Bonsai server.';
+  S.speechMsg = S.backend === 'browser-gpu' ? 'Browser GPU path selected' : 'Mac-edge backup selected';
   saveDraft();
   render();
   updateSecureContextCallout();
@@ -885,6 +900,9 @@ function workerRequest(type, payload={}, done=['ready','error'], timeoutMs=12000
       const pending = browserWorkerPending;
       browserWorkerPending = null;
       try{ worker.postMessage({type:'interrupt'}); }catch(_){}
+      try{ worker.terminate(); }catch(_){}
+      if(browserWorker === worker) browserWorker = null;
+      browserModelReady = false;
       if(pending) pending.resolve({status:'timeout', detail:`${type} timed out after ${Math.round(timeoutMs/1000)}s`});
     }, timeoutMs);
     browserWorkerPending = {resolve, timer, done:new Set(done.concat(['error']))};
@@ -903,16 +921,18 @@ async function warmBrowserModel(){
   browserModelStatus(out.status === 'ready' ? 'ready' : 'error', out.detail || out.model || out.status, {elapsed_ms:Math.round(performance.now()-started), model:out.model});
 }
 
-async function runBrowserGpuSpanProbe(text){
+async function runBrowserGpuSpanProbe(text, options={}){
   if(!window.isSecureContext || !navigator.gpu){
     return {ok:false, detail: window.isSecureContext ? 'navigator.gpu unavailable' : 'HTTPS required for WebGPU'};
   }
+  const loadTimeoutMs = options.loadTimeoutMs || 120000;
+  const generateTimeoutMs = options.generateTimeoutMs || 60000;
   const started = performance.now();
   if(!browserModelReady){
-    const loaded = await workerRequest('load', {}, ['ready','error'], 120000);
+    const loaded = await workerRequest('load', {}, ['ready','error'], loadTimeoutMs);
     if(loaded.status !== 'ready') return {ok:false, detail:loaded.detail || loaded.status, elapsed_ms:Math.round(performance.now()-started)};
   }
-  const generated = await workerRequest('generate-spans', {text}, ['complete','error'], 60000);
+  const generated = await workerRequest('generate-spans', {text}, ['complete','error'], generateTimeoutMs);
   const elapsed = Math.round(performance.now()-started);
   if(generated.status !== 'complete') return {ok:false, detail:generated.detail || generated.status, elapsed_ms:elapsed};
   browserModelStatus('complete','browser span output ready', {elapsed_ms:elapsed,tokens:generated.numTokens||0,tps:generated.tps||0,output_preview:generated.output||'',model:generated.model});
@@ -1091,9 +1111,12 @@ async function doScrub(){
       if(S.screen==='scrubbing') render();
       return;
     }
-    S.backendNote = 'Browser GPU selected: attempting local Bonsai q1 span generation; Mac-edge verifier remains the final egress gate.';
+    S.backendNote = 'Browser GPU selected: attempting local Bonsai q1 span generation. Demo guardrail: if phone-local load is not ready quickly, Mac-edge Bonsai takes over.';
     setJob('scrub','running','browser GPU span probe');
-    const probe = await runBrowserGpuSpanProbe(S.note);
+    const probe = await runBrowserGpuSpanProbe(S.note, {
+      loadTimeoutMs: SCRUB_BROWSER_LOAD_TIMEOUT_MS,
+      generateTimeoutMs: SCRUB_BROWSER_GENERATE_TIMEOUT_MS
+    });
     if(probe.ok){
       S.backendNote = `Browser GPU produced local span candidates in ${(probe.elapsed_ms/1000).toFixed(1)}s; finalizing through the verifier gate.`;
       setJob('scrub','running','verifying browser spans');
@@ -1109,7 +1132,7 @@ async function doScrub(){
       }
       S.backendNote = `Browser GPU produced output, but the verifier finalizer rejected it (${finalized.detail}); falling back to Mac-edge Bonsai.`;
     } else {
-      S.backendNote = `Browser GPU probe did not complete (${probe.detail}); falling back to Mac-edge Bonsai and verifier.`;
+      S.backendNote = `Browser GPU probe did not complete within the demo budget (${probe.detail}); falling back to Mac-edge Bonsai and verifier.`;
     }
     setJob('scrub','running','Mac-edge verifier fallback');
   } else {
