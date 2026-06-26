@@ -11,9 +11,151 @@ public enum DemoPhase: String, CaseIterable, Sendable {
     case delivered = "Delivered"
 }
 
-public struct DemoRedaction: Equatable, Sendable {
+public enum BackendRuntime: String, CaseIterable, Codable, Equatable, Sendable {
+    case mlxSwiftMock = "mlx-swift mock"
+    case edgeHTTPMock = "edge HTTP mock"
+
+    public var label: String {
+        switch self {
+        case .mlxSwiftMock: "MLX Swift mock"
+        case .edgeHTTPMock: "Edge HTTP mock"
+        }
+    }
+
+    public var detail: String {
+        switch self {
+        case .mlxSwiftMock:
+            "Simulator stand-in for in-process Bonsai MLX text on iPhone 11 class hardware."
+        case .edgeHTTPMock:
+            "Simulator stand-in for the laptop `/api/scrub` JSON contract."
+        }
+    }
+}
+
+public struct BackendSelection: Codable, Equatable, Sendable {
+    public var runtime: BackendRuntime
+    public var deviceClass: String
+    public var model: String
+
+    public init(
+        runtime: BackendRuntime = .mlxSwiftMock,
+        deviceClass: String = "iPhone 11 / A13 simulator budget",
+        model: String = "ternary-bonsai-1.7b@mock-mlx"
+    ) {
+        self.runtime = runtime
+        self.deviceClass = deviceClass
+        self.model = model
+    }
+}
+
+public struct BackendScrubRequest: Codable, Equatable, Sendable {
+    public let text: String
+    public let backend: BackendSelection
+
+    public init(text: String, backend: BackendSelection) {
+        self.text = text
+        self.backend = backend
+    }
+}
+
+public struct BackendRedaction: Codable, Equatable, Sendable {
     public let entity: String
-    public let replacement: String
+    public let layer: String
+
+    public init(entity: String, layer: String) {
+        self.entity = entity
+        self.layer = layer
+    }
+}
+
+public struct BackendCommitment: Codable, Equatable, Sendable {
+    public let text: String
+    public let status: String
+
+    public init(text: String, status: String = "open") {
+        self.text = text
+        self.status = status
+    }
+}
+
+public struct BackendAutonomyDelta: Codable, Equatable, Sendable {
+    public let logged: Bool
+    public let signals: [String]
+    public let direction: String
+
+    public init(logged: Bool = true, signals: [String], direction: String) {
+        self.logged = logged
+        self.signals = signals
+        self.direction = direction
+    }
+}
+
+public struct BackendRecord: Codable, Equatable, Sendable {
+    public let clientPseudonym: String
+    public let themes: [String]
+    public let commitments: [BackendCommitment]
+    public let followUps: [String]
+    public let riskFlags: [String]
+    public let autonomyDelta: BackendAutonomyDelta
+    public let nextTouch: String
+
+    public init(
+        clientPseudonym: String,
+        themes: [String],
+        commitments: [BackendCommitment],
+        followUps: [String],
+        riskFlags: [String],
+        autonomyDelta: BackendAutonomyDelta,
+        nextTouch: String
+    ) {
+        self.clientPseudonym = clientPseudonym
+        self.themes = themes
+        self.commitments = commitments
+        self.followUps = followUps
+        self.riskFlags = riskFlags
+        self.autonomyDelta = autonomyDelta
+        self.nextTouch = nextTouch
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case clientPseudonym = "client_pseudonym"
+        case themes
+        case commitments
+        case followUps = "follow_ups"
+        case riskFlags = "risk_flags"
+        case autonomyDelta = "autonomy_delta"
+        case nextTouch = "next_touch"
+    }
+}
+
+public struct BackendScrubResponse: Codable, Equatable, Sendable {
+    public let scrubbedText: String
+    public let redactions: [BackendRedaction]
+    public let gatePass: Bool
+    public let residualCount: Int
+    public let record: BackendRecord
+
+    public init(
+        scrubbedText: String,
+        redactions: [BackendRedaction],
+        gatePass: Bool,
+        residualCount: Int,
+        record: BackendRecord
+    ) {
+        self.scrubbedText = scrubbedText
+        self.redactions = redactions
+        self.gatePass = gatePass
+        self.residualCount = residualCount
+        self.record = record
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case scrubbedText = "scrubbed_text"
+        case redactions
+        case gatePass = "gate_pass"
+        case residualCount = "residual_count"
+        case record
+    }
 }
 
 public struct DemoGateResult: Equatable, Sendable {
@@ -21,15 +163,35 @@ public struct DemoGateResult: Equatable, Sendable {
     public let residualCount: Int
 }
 
-public struct DemoRecord: Equatable, Sendable {
-    public let summary: String
-    public let followUp: String
-}
-
 public struct DemoSecureStoreSnapshot: Equatable, Sendable {
     public let rawNoteStored: Bool
     public let redactionMapStored: Bool
     public let redactionCount: Int
+}
+
+public protocol AirplaneInferenceProvider: Sendable {
+    var runtime: BackendRuntime { get }
+    func scrub(_ request: BackendScrubRequest) throws -> BackendScrubResponse
+}
+
+public struct SimulatorMLXSwiftTextProvider: AirplaneInferenceProvider {
+    public let runtime: BackendRuntime = .mlxSwiftMock
+
+    public init() {}
+
+    public func scrub(_ request: BackendScrubRequest) throws -> BackendScrubResponse {
+        SimulatorBackend.scrub(request, layer: "mlx-swift-mock")
+    }
+}
+
+public struct SimulatorEdgeHTTPProvider: AirplaneInferenceProvider {
+    public let runtime: BackendRuntime = .edgeHTTPMock
+
+    public init() {}
+
+    public func scrub(_ request: BackendScrubRequest) throws -> BackendScrubResponse {
+        SimulatorBackend.scrub(request, layer: "edge-http-mock")
+    }
 }
 
 public struct AirplaneDemoFlow: Equatable, Sendable {
@@ -40,23 +202,36 @@ public struct AirplaneDemoFlow: Equatable, Sendable {
     """
 
     public private(set) var phase: DemoPhase = .idle
+    public private(set) var backend = BackendSelection()
     public private(set) var capturedText: String = ""
     public private(set) var scrubbedText: String = ""
-    public private(set) var redactions: [DemoRedaction] = []
+    public private(set) var redactions: [BackendRedaction] = []
     public private(set) var gateResult: DemoGateResult?
-    public private(set) var record: DemoRecord?
-    public private(set) var deliveredPayload: DemoRecord?
+    public private(set) var record: BackendRecord?
+    public private(set) var deliveredPayload: BackendRecord?
+    public private(set) var lastRequest: BackendScrubRequest?
+    public private(set) var lastResponse: BackendScrubResponse?
 
     private var secureStore = SimulatorOnlySecureStore()
 
-    public init() {}
+    public init(backend: BackendSelection = BackendSelection()) {
+        self.backend = backend
+    }
 
     public var secureStoreSnapshot: DemoSecureStoreSnapshot {
         secureStore.snapshot
     }
 
     public mutating func reset() {
-        self = AirplaneDemoFlow()
+        let selected = backend
+        self = AirplaneDemoFlow(backend: selected)
+    }
+
+    public mutating func selectBackend(_ runtime: BackendRuntime) {
+        backend.runtime = runtime
+        backend.model = runtime == .mlxSwiftMock
+            ? "ternary-bonsai-1.7b@mock-mlx"
+            : "ternary-bonsai-1.7b@mock-edge-http"
     }
 
     public mutating func capture(_ note: String = AirplaneDemoFlow.sampleNote) {
@@ -66,31 +241,37 @@ public struct AirplaneDemoFlow: Equatable, Sendable {
         gateResult = nil
         record = nil
         deliveredPayload = nil
+        lastRequest = nil
+        lastResponse = nil
         secureStore.save(rawNote: note, redactions: [])
         phase = .capturing
     }
 
-    public mutating func scrubAndGate() {
+    public mutating func scrubAndGate(provider: AirplaneInferenceProvider? = nil) {
         guard phase == .capturing else { return }
 
         phase = .scrubbing
-        let result = SimulatorRedactor.scrub(capturedText)
-        scrubbedText = result.text
-        redactions = result.redactions
-        secureStore.save(rawNote: capturedText, redactions: redactions)
+        let activeProvider = provider ?? defaultProvider(for: backend.runtime)
+        let request = BackendScrubRequest(text: capturedText, backend: backend)
+        lastRequest = request
 
-        let residualCount = SimulatorVerifier.residualIdentifierCount(in: scrubbedText)
-        gateResult = DemoGateResult(passed: residualCount == 0, residualCount: residualCount)
+        guard let response = try? activeProvider.scrub(request) else {
+            gateResult = DemoGateResult(passed: false, residualCount: 1)
+            phase = .gated
+            return
+        }
+
+        scrubbedText = response.scrubbedText
+        redactions = response.redactions
+        record = response.record
+        lastResponse = response
+        secureStore.save(rawNote: capturedText, redactions: redactions)
+        gateResult = DemoGateResult(passed: response.gatePass, residualCount: response.residualCount)
         phase = .gated
     }
 
     public mutating func structureCleanRecord() {
-        guard phase == .gated, gateResult?.passed == true else { return }
-
-        record = DemoRecord(
-            summary: "Client practiced an autonomy-supportive coaching plan with identifiers removed.",
-            followUp: "Practice a five minute breathing routine before the next work standup."
-        )
+        guard phase == .gated, gateResult?.passed == true, record != nil else { return }
         phase = .structured
     }
 
@@ -107,9 +288,18 @@ public struct AirplaneDemoFlow: Equatable, Sendable {
     }
 }
 
+private func defaultProvider(for runtime: BackendRuntime) -> AirplaneInferenceProvider {
+    switch runtime {
+    case .mlxSwiftMock:
+        SimulatorMLXSwiftTextProvider()
+    case .edgeHTTPMock:
+        SimulatorEdgeHTTPProvider()
+    }
+}
+
 private struct SimulatorOnlySecureStore: Equatable, Sendable {
     private var rawNote: String?
-    private var redactionMap: [DemoRedaction] = []
+    private var redactionMap: [BackendRedaction] = []
 
     var snapshot: DemoSecureStoreSnapshot {
         DemoSecureStoreSnapshot(
@@ -119,13 +309,13 @@ private struct SimulatorOnlySecureStore: Equatable, Sendable {
         )
     }
 
-    mutating func save(rawNote: String, redactions: [DemoRedaction]) {
+    mutating func save(rawNote: String, redactions: [BackendRedaction]) {
         self.rawNote = rawNote
         self.redactionMap = redactions
     }
 }
 
-private enum SimulatorRedactor {
+private enum SimulatorBackend {
     private static let replacements: [(needle: String, entity: String, replacement: String)] = [
         ("Jordan Lee", "PERSON", "[PERSON]"),
         ("Maya", "PERSON", "[PERSON]"),
@@ -133,20 +323,6 @@ private enum SimulatorRedactor {
         ("March 12", "DATE", "[DATE]")
     ]
 
-    static func scrub(_ text: String) -> (text: String, redactions: [DemoRedaction]) {
-        var output = text
-        var redactions: [DemoRedaction] = []
-
-        for item in replacements where output.contains(item.needle) {
-            output = output.replacingOccurrences(of: item.needle, with: item.replacement)
-            redactions.append(DemoRedaction(entity: item.entity, replacement: item.replacement))
-        }
-
-        return (output, redactions)
-    }
-}
-
-private enum SimulatorVerifier {
     private static let blockedTokens = [
         "Jordan Lee",
         "Maya",
@@ -154,9 +330,38 @@ private enum SimulatorVerifier {
         "March 12"
     ]
 
-    static func residualIdentifierCount(in text: String) -> Int {
-        blockedTokens.reduce(0) { count, token in
-            text.localizedCaseInsensitiveContains(token) ? count + 1 : count
+    static func scrub(_ request: BackendScrubRequest, layer: String) -> BackendScrubResponse {
+        var output = request.text
+        var redactions: [BackendRedaction] = []
+
+        for item in replacements where output.contains(item.needle) {
+            output = output.replacingOccurrences(of: item.needle, with: item.replacement)
+            redactions.append(BackendRedaction(entity: item.entity, layer: layer))
         }
+
+        let residualCount = blockedTokens.reduce(0) { count, token in
+            output.localizedCaseInsensitiveContains(token) ? count + 1 : count
+        }
+
+        return BackendScrubResponse(
+            scrubbedText: output,
+            redactions: redactions,
+            gatePass: residualCount == 0,
+            residualCount: residualCount,
+            record: BackendRecord(
+                clientPseudonym: "client ready circle",
+                themes: ["routine building", "workplace preparation"],
+                commitments: [BackendCommitment(text: "five minute breathing routine")],
+                followUps: [
+                    "Before the next touch, try this once on your own: five minute breathing routine."
+                ],
+                riskFlags: [],
+                autonomyDelta: BackendAutonomyDelta(
+                    signals: ["self_initiated", "commitment_completed"],
+                    direction: "client_led"
+                ),
+                nextTouch: "scheduled"
+            )
+        )
     }
 }

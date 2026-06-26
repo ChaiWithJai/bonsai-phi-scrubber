@@ -88,7 +88,7 @@ The fix is to put both devices on the iPhone's own local network:
 5. Review the clean **Care record** (with the commitment).
 6. Tap **"Send to #coach-records."**
 7. The app re-runs the verifier over the exact Slack payload, then posts only if the Slack credential is configured.
-8. On success, tap **"View Slack"** to see the de-identified Slack card; in preview mode the screen explains which credential is missing.
+8. On success, tap **"View Slack"** to see the scrubbed Slack card; in preview mode the screen explains which credential is missing.
 
 ## Wire Slack — the real post (the payoff)
 
@@ -108,7 +108,7 @@ By default the record shows as a **preview**. To make it actually land in a Slac
    SLACK_WEBHOOK_URL='https://hooks.slack.com/services/XXX/YYY/ZZZ' AIRPLANE_WEB_ADDR=0.0.0.0:8099 ./run.sh web
    ```
    On startup it prints `slack: webhook configured — records post for real`.
-4. Run the demo. When the queue flushes, the **de-identified record posts to that Slack channel for real** — no name, no member ID. Open Slack on the big screen and evaluate it.
+4. Run the demo. When the queue flushes, the **scrubbed record posts to that Slack channel for real** — no name, no member ID. Open Slack on the big screen and evaluate it.
 
 ### Pack-routed path: bot token + channel map
 
@@ -128,7 +128,7 @@ Use this when you want the channel to come from `packs/coach-session/sink.yaml` 
    If `SLACK_CHANNEL` is absent, the sink routes to `channelMap.default` in `sink.yaml`.
 4. On startup it prints `slack: SLACK_BOT_TOKEN set — records post to #coach-records`.
 
-The Slack endpoint re-runs the verifier gate over the outgoing de-identified record before posting. A residual identifier blocks the send before Slack credentials are used. Without a webhook or bot token, the demo still runs and the delivered screen explains which credential to set.
+The Slack endpoint re-runs the verifier gate over the outgoing scrubbed record before posting. A residual identifier blocks the send before Slack credentials are used. Without a webhook or bot token, the demo still runs and the delivered screen explains which credential to set.
 
 Preflight the current sink before the demo:
 

@@ -13,6 +13,10 @@ public final class AirplaneDemoViewModel: ObservableObject {
         flow.reset()
     }
 
+    public func selectBackend(_ runtime: BackendRuntime) {
+        flow.selectBackend(runtime)
+    }
+
     public func advance() {
         switch flow.phase {
         case .idle:
@@ -42,6 +46,7 @@ public struct AirplaneDemoView: View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 18) {
                 phaseHeader
+                backendSelector
                 content
                 Spacer(minLength: 0)
                 controls
@@ -61,6 +66,25 @@ public struct AirplaneDemoView: View {
         }
     }
 
+    private var backendSelector: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Picker("Backend", selection: Binding(
+                get: { model.flow.backend.runtime },
+                set: { model.selectBackend($0) }
+            )) {
+                ForEach(BackendRuntime.allCases, id: \.self) { runtime in
+                    Text(runtime.label).tag(runtime)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            Text(model.flow.backend.runtime.detail)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .disabled(model.flow.phase != .idle)
+    }
+
     @ViewBuilder
     private var content: some View {
         switch model.flow.phase {
@@ -71,6 +95,11 @@ public struct AirplaneDemoView: View {
         case .scrubbing, .gated:
             VStack(alignment: .leading, spacing: 12) {
                 labeledBlock("De-identified note", model.flow.scrubbedText)
+                if let response = model.flow.lastResponse {
+                    Text("Backend: \(model.flow.backend.runtime.label) · \(response.redactions.count) redactions · schema-compatible response")
+                        .font(.footnote.monospaced())
+                        .foregroundStyle(.secondary)
+                }
                 if let gate = model.flow.gateResult {
                     Label(
                         gate.passed ? "Verifier passed: zero residual simulated identifiers" : "Verifier blocked",
@@ -85,7 +114,7 @@ public struct AirplaneDemoView: View {
         case .structured, .sendHeld, .flushing, .delivered:
             VStack(alignment: .leading, spacing: 12) {
                 if let record = model.flow.record {
-                    labeledBlock("Structured record", "\(record.summary)\n\nFollow-up: \(record.followUp)")
+                    labeledBlock("Structured record", recordSummary(record))
                 }
                 if model.flow.phase == .sendHeld {
                     Label("Send held while offline", systemImage: "airplane")
@@ -97,6 +126,23 @@ public struct AirplaneDemoView: View {
                 }
             }
         }
+    }
+
+    private func recordSummary(_ record: BackendRecord) -> String {
+        let themes = record.themes.joined(separator: " · ")
+        let commitments = record.commitments
+            .map { "\($0.text) · \($0.status)" }
+            .joined(separator: "\n")
+        let followUps = record.followUps.joined(separator: "\n")
+        let risks = record.riskFlags.isEmpty ? "none" : record.riskFlags.joined(separator: " · ")
+        return """
+        client_pseudonym: \(record.clientPseudonym)
+        themes: \(themes)
+        commitments: \(commitments)
+        follow_ups: \(followUps)
+        risk_flags: \(risks)
+        next_touch: \(record.nextTouch)
+        """
     }
 
     private var controls: some View {

@@ -13,9 +13,21 @@ An iOS Simulator mock can prove interaction choreography:
 4. show verifier gate pass/block state
 5. hold send while the in-app airplane-mode control is on
 6. flush a clean record when the control turns off
+7. switch between backend run modes before capture without changing the UI flow
 
 That is useful for product review of the first touch point and the proof beat. It does
 not prove the privacy claim.
+
+## Current Simulator Backend Modes
+
+`shells/ios` now carries two deterministic mocks with backend-compatible DTOs:
+
+- `mlx-swift mock` — the intended future shape of the in-process MLX text adapter.
+- `edge HTTP mock` — the intended future shape of the laptop/web `/api/scrub` adapter.
+
+Both produce the same transport-shaped response fields: `scrubbed_text`, `redactions`,
+`gate_pass`, `residual_count`, and `record`. This keeps the Swift UI interoperable with
+the backend contract while making clear that no real model has run in Simulator.
 
 ## What Simulator Cannot Prove
 
@@ -35,10 +47,10 @@ decision. That remains the blocker for a real `shells/ios/` implementation.
 
 Until that measurement exists:
 
-- do not add `./run.sh ios`
+- do not list `./run.sh ios` as the production proof path
 - do not mark M3 tasks complete
-- do not list iOS as a built shell
-- if a visual mock is needed, name it `shells/ios-sim-mock/` and label it as choreography-only
+- do not list iOS as a hardware-proven shell
+- label the current `shells/ios` package as simulator choreography + interop scaffolding only
 
 ## Future Real File Map
 
@@ -46,7 +58,7 @@ These files are not created yet:
 
 - `shells/ios/` SwiftUI app shell
 - UniFFI binding configuration for `airplane-core`
-- Swift `InferenceProvider` backed by `mlx-swift`
+- Swift `InferenceProvider` backed by real `mlx-swift`
 - Keychain-backed `SecureStore`
 - ASR/text `Capture`
 - Slack `Sink` that receives only verifier-clean records

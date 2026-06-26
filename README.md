@@ -1,7 +1,7 @@
 # Airplane Mode
 
 Build a healthcare hackathon demo where a sensitive note is scrubbed at the edge,
-verified before egress, and only a de-identified care record reaches Slack.
+verified before egress, and only a scrubbed care record reaches Slack.
 
 This repo is for people who already run messy real-world workflows: automations,
 scripts, Google Sheets glue, intake forms, Zapier-style handoffs, or EHR-adjacent
@@ -17,13 +17,18 @@ synthetic note -> local scrubber -> verifier gate -> clean Slack record
 ```
 
 The raw note is captured in a phone browser, but the compute runs on your laptop
-as the local edge node. A PrismML Bonsai model helps identify PHI-like text. The
+as the local edge node. A PrismML Bonsai model helps identify sensitive text. The
 model output is not trusted raw: the Rust core parses, clamps, redacts, and then
 re-scans the exact outbound Slack payload before anything leaves.
 
 This is not a production medical device, not HIPAA compliance in a box, and not
 the final iPhone airplane-mode proof. It is a starter template for learning how
 to structure healthcare AI workflows so sensitive data has a real boundary.
+
+For adopters, the point is the job done: sensitive notes stop flowing into shared
+tools before they are scrubbed. For builders, the point is the reference
+architecture: model-as-port, deterministic harness, verifier gate, and
+declarative packs.
 
 ## Who Should Use This
 
@@ -299,13 +304,19 @@ shells/cli
 shells/mcp
   agent-callable shell
 
+shells/ios
+  simulator-safe native scaffold with selectable backend mocks
+
 packs/coach-session
   reference healthcare coaching pack
 ```
 
 The model is a port. Bonsai is useful because it is small enough to make local
 edge inference plausible, but the verifier gate is what decides whether anything
-can leave.
+can leave. The iOS scaffold currently lets builders switch between an
+`mlx-swift` text-path mock and an edge-HTTP mock that both emit the same
+backend-shaped scrub response. That is interoperability scaffolding, not the
+real iPhone 11 hardware proof.
 
 ## Troubleshooting
 
@@ -332,6 +343,7 @@ can leave.
 | `docs/demo/onboarding.md` | Phone demo and Slack runbook. |
 | `docs/extending.md` | Pack extension walkthrough. |
 | `docs/demo/how-the-demo-works.md` | Architecture, topology, workload profile, worked examples. |
+| `docs/positioning/cncf-end-user-and-inference-ecosystem.md` | Audience split: adopter outcome language vs. builder mechanism language. |
 | `AGENTS.md` | Harnessed build loop and hard rules. |
 | `CANON.md` | Design canon index. |
 
@@ -342,7 +354,7 @@ can leave.
 - Slack and trajectory storage are behind the verifier gate.
 - Packs are declarative and code-free.
 - The current web demo uses the laptop as the edge node.
-- Native iPhone, real airplane-mode proof, and encrypted trajectory storage are
-  tracked as future work.
+- Native iPhone, real airplane-mode proof, real `mlx-swift` text inference, and
+  encrypted trajectory storage are tracked as future work.
 
 Built to make sensitive workflows easier to inspect, reproduce, and improve.
