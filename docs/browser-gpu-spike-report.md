@@ -253,6 +253,27 @@ browser proposals:
 | `/api/send` | 0.18s, Slack accepted |
 | `/api/trajectory` | 0.04s, gate-clean trajectory stored as `local-000009` |
 
+The same path now has a repeatable smoke command:
+
+```bash
+AIRPLANE_WEB_URL=http://127.0.0.1:8099 ./run.sh browser-span-smoke
+AIRPLANE_WEB_URL=https://127.0.0.1:8443 ./run.sh browser-span-smoke
+```
+
+The local HTTPS proxy was verified for the browser path:
+
+| Step | Result |
+| --- | --- |
+| `https://127.0.0.1:8443/` | served the app over local TLS |
+| `https://127.0.0.1:8443/bonsai-worker.js` | served the q1 WebGPU worker |
+| `AIRPLANE_WEB_URL=http://127.0.0.1:8099 ./run.sh browser-span-smoke` | `browser_spans_seconds: 5.20`, Slack accepted, trajectory `local-000011` |
+| `AIRPLANE_WEB_URL=https://127.0.0.1:8443 ./run.sh browser-span-smoke` | `browser_spans_seconds: 2.72`, Slack accepted, trajectory `local-000010` |
+
+Supply-chain truth: the worker currently imports `@huggingface/transformers`
+from a public CDN. That does **not** send raw notes or span payloads to the CDN,
+but it does fetch runtime code from the public web. For a regulated end-user
+deployment, self-host or vendor that bundle behind the same first-party network.
+
 The scrub result caught:
 
 - `PERSON` via Bonsai

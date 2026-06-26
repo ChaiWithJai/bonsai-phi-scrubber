@@ -20,6 +20,7 @@ case "$verb" in
   mcp)    cargo build -q --bin airplane-mcp; target/debug/airplane-mcp ;;
   ios-sim) (cd shells/ios && swift test && swift build) ;;
   slack-smoke) shift; ./scripts/smoke-slack-sink.sh "$@" ;;
+  browser-span-smoke) shift; ./scripts/smoke-browser-spans.sh "$@" ;;
   help|*) cat <<'EOF'
 Airplane Mode — run.sh   (on-device PHI scrubber; CLI shell over airplane-core)
   ./run.sh eval            check recall/leakage against eval/golden-run.txt
@@ -34,6 +35,8 @@ Airplane Mode — run.sh   (on-device PHI scrubber; CLI shell over airplane-core
   ./run.sh mcp             start the stdio MCP shell (agent-callable scrub tool)
   ./run.sh ios-sim         verify the simulator-safe iOS shell scaffold (no hardware proof)
   ./run.sh slack-smoke     post one synthetic gate-clean record through the Slack sink
+  ./run.sh browser-span-smoke
+                            profile browser-span finalizer -> Slack -> trajectory
 
 Needs the model layer running:  ./scripts/serve-model.sh
 Tune contextual passes:         AIRPLANE_EVAL_PASSES=5 ./run.sh eval --update
@@ -43,6 +46,7 @@ Use a different pack:           PACK=packs/my-pack ./run.sh gates
 Phone demo server:              ./run.sh web
 Phone observation:              AIRPLANE_WEB_URL=http://127.0.0.1:8099 ./run.sh phone-observe
 Slack smoke target:             AIRPLANE_WEB_URL=http://127.0.0.1:8099 ./run.sh slack-smoke
+Browser span smoke target:      AIRPLANE_WEB_URL=https://127.0.0.1:8443 ./run.sh browser-span-smoke
 EOF
   ;;
 esac
