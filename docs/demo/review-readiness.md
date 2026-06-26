@@ -48,7 +48,7 @@ The current committed eval target is `eval/golden-run.txt`:
 | #2 Reward-lint | Covered | `Pack::validate_reward_lint`; `./run.sh gates`; web/CLI tests. |
 | #3 Scope-boundary | Covered | `Pack::validate_scope_boundary`; `./run.sh gates`; escalation policy in `policy.yaml`. |
 | #4 Follow-up/autonomy | MVP covered | Web structurer emits client-paced follow-up and autonomy signals; clinical-risk language surfaces escalation. Not a trained policy. |
-| #5 Trajectory recorder | MVP partial | `/api/trajectory` gates de-identified trajectory text and increments a counter only on clean records. Not an encrypted durable `(s,a,r,s')` store yet. |
+| #5 Trajectory recorder | Local durable MVP; encryption still open | `/api/trajectory` builds a de-identified `(s,a,r,s')` JSON tuple, gates the exact serialized payload with the same verifier, appends gate-clean records to local JSONL, and returns a count recovered from the store. No policy training. Not enclave-encrypted at rest yet. |
 | #6 Themes quality | Covered for sample/demo | Themes are grounded, junk-filtered, and have deterministic fallback tests. |
 | #7 Precision tuning | Improved, still recall-first | Precision tracked; over-redactions reduced while keeping 100% recall / 0 leakage. Remaining extras are privacy-conservative. |
 | #8 MCP shell | Covered for smoke/parity | `shells/mcp`; `./run.sh mcp`; `scripts/smoke-mcp-cli-parity.sh` compares CLI/MCP scrubbed text on golden notes. |

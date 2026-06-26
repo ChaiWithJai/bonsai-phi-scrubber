@@ -13,14 +13,13 @@ use anyhow::{Context, Result};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 const DEFAULT_PACK_DIR: &str = "packs/coach-session";
 const INDEX: &str = "shells/web/static/index.html";
 const DEFAULT_ADDR: &str = "0.0.0.0:8088";
 const PASSES: u32 = 5;
-static TRAJECTORY_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 fn repo_path(rel: &str) -> PathBuf {
     let direct = PathBuf::from(rel);
@@ -39,6 +38,14 @@ fn pack_path() -> PathBuf {
         .filter(|s| !s.trim().is_empty())
         .unwrap_or_else(|| DEFAULT_PACK_DIR.to_string());
     repo_path(&rel)
+}
+
+fn trajectory_store_path() -> PathBuf {
+    std::env::var("AIRPLANE_TRAJECTORY_STORE")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| repo_path(".airplane/trajectories.jsonl"))
 }
 
 // ---- llama-server adapter (InferenceProvider port, web side) -----------------
@@ -557,22 +564,102 @@ fn handle_send(body: &str) -> Value {
     }
 }
 
-fn trajectory_text(record: &Value) -> String {
-    let mut parts = Vec::new();
-    for key in ["themes", "follow_ups"] {
-        if let Some(items) = record[key].as_array() {
-            parts.extend(items.iter().filter_map(|v| v.as_str()).map(str::to_string));
-        }
-    }
-    if let Some(items) = record["commitments"].as_array() {
-        parts.extend(
+fn commitments(record: &Value) -> Vec<Value> {
+    record["commitments"]
+        .as_array()
+        .map(|items| {
             items
                 .iter()
-                .filter_map(|v| v["text"].as_str())
-                .map(str::to_string),
-        );
+                .filter_map(|item| {
+                    let text = item["text"].as_str()?.trim();
+                    if text.is_empty() {
+                        return None;
+                    }
+                    Some(json!({
+                        "text": text,
+                        "status": item["status"].as_str().unwrap_or("open")
+                    }))
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn first_string(record: &Value, key: &str) -> Option<String> {
+    record[key]
+        .as_array()
+        .and_then(|items| items.first())
+        .and_then(|item| item.as_str())
+        .map(str::to_string)
+}
+
+fn trajectory_tuple(record: &Value, trajectory_id: &str) -> Value {
+    let commitments = commitments(record);
+    let action = first_string(record, "follow_ups").unwrap_or_else(|| "no follow-up".to_string());
+    let next_touch_status = if record["next_touch"]
+        .as_str()
+        .unwrap_or("")
+        .trim()
+        .is_empty()
+    {
+        "unset"
+    } else {
+        "scheduled"
+    };
+    json!({
+        "schema": "airplane.trajectory.v1",
+        "trajectory_id": trajectory_id,
+        "state": {
+            "themes": string_array(record, "themes"),
+            "risk_flags": string_array(record, "risk_flags"),
+            "next_touch_status": next_touch_status,
+        },
+        "action": {
+            "follow_up": action,
+            "commitments": commitments,
+        },
+        "reward": {
+            "autonomy_delta": record["autonomy_delta"],
+        },
+        "next_state": {
+            "commitments": commitments,
+            "follow_up_sent": true,
+            "outcome_status": "pending",
+            "next_touch_status": next_touch_status,
+        }
+    })
+}
+
+fn append_trajectory(trajectory: &Value) -> Result<usize> {
+    let path = trajectory_store_path();
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("create trajectory store dir {}", parent.display()))?;
     }
-    parts.join("\n")
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .with_context(|| format!("open trajectory store {}", path.display()))?;
+    writeln!(file, "{}", serde_json::to_string(&trajectory)?)
+        .with_context(|| format!("append trajectory store {}", path.display()))?;
+    count_trajectories(&path)
+}
+
+fn count_trajectories(path: &Path) -> Result<usize> {
+    let text = std::fs::read_to_string(path).unwrap_or_default();
+    Ok(text.lines().filter(|line| !line.trim().is_empty()).count())
+}
+
+fn next_trajectory_id(path: &Path) -> String {
+    let next = count_trajectories(path).unwrap_or(0) + 1;
+    format!("local-{next:06}")
+}
+
+fn has_trajectory_signal(record: &Value) -> bool {
+    !string_array(record, "themes").is_empty()
+        || !string_array(record, "follow_ups").is_empty()
+        || !commitments(record).is_empty()
 }
 
 fn handle_trajectory(body: &str) -> Value {
@@ -580,19 +667,25 @@ fn handle_trajectory(body: &str) -> Value {
         Ok(v) => v,
         Err(e) => return json!({"ok": false, "error": format!("parse request body: {e}")}),
     };
-    let text = trajectory_text(&input["record"]);
-    if text.trim().is_empty() {
+    if !has_trajectory_signal(&input["record"]) {
         return json!({"ok": false, "error": "trajectory record is empty"});
     }
+    let store_path = trajectory_store_path();
+    let trajectory_id = next_trajectory_id(&store_path);
+    let trajectory = trajectory_tuple(&input["record"], &trajectory_id);
+    let text = match serde_json::to_string(&trajectory) {
+        Ok(text) => text,
+        Err(e) => return json!({"ok": false, "error": format!("serialize trajectory: {e}")}),
+    };
     let pack = match Pack::load(&pack_path()).context("load coach-session pack") {
         Ok(p) => p,
         Err(e) => return json!({"ok": false, "error": format!("{e:#}")}),
     };
     match VerifierGate::new(&pack.rules).check(&text) {
-        GateDecision::Pass => {
-            let count = TRAJECTORY_COUNT.fetch_add(1, Ordering::SeqCst) + 1;
-            json!({"ok": true, "count": count})
-        }
+        GateDecision::Pass => match append_trajectory(&trajectory) {
+            Ok(count) => json!({"ok": true, "count": count, "trajectory_id": trajectory_id}),
+            Err(e) => json!({"ok": false, "error": format!("{e:#}")}),
+        },
         GateDecision::Block { residual } => json!({
             "ok": false,
             "error": "trajectory gate blocked residual identifiers",
@@ -789,8 +882,20 @@ fn main() -> Result<()> {
 mod tests {
     use super::*;
     use std::sync::Mutex;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     static TRAJECTORY_TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    fn isolated_trajectory_store(name: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!("airplane-{name}-{nonce}.jsonl"));
+        std::env::set_var("AIRPLANE_TRAJECTORY_STORE", &path);
+        let _ = std::fs::remove_file(&path);
+        path
+    }
 
     #[test]
     fn fallback_themes_are_grounded_for_sample_note() {
@@ -885,13 +990,13 @@ credentials:
     #[test]
     fn trajectory_gate_blocks_residual_identifier_without_increment() {
         let _guard = TRAJECTORY_TEST_LOCK.lock().unwrap();
-        let before = TRAJECTORY_COUNT.load(Ordering::SeqCst);
+        let path = isolated_trajectory_store("blocked-trajectory");
         let blocked = handle_trajectory(
             r#"{"record":{"themes":["member CM-204815"],"commitments":[],"follow_ups":[]}}"#,
         );
         assert_eq!(blocked["ok"], false, "{blocked}");
         assert_eq!(blocked["residual_count"], 1, "{blocked}");
-        assert_eq!(TRAJECTORY_COUNT.load(Ordering::SeqCst), before);
+        assert!(!path.exists(), "{blocked}");
     }
 
     #[test]
@@ -927,25 +1032,56 @@ credentials:
     }
 
     #[test]
-    fn trajectory_gate_increments_for_clean_record() {
+    fn trajectory_store_persists_gate_clean_jsonl_tuple() {
         let _guard = TRAJECTORY_TEST_LOCK.lock().unwrap();
-        let before = TRAJECTORY_COUNT.load(Ordering::SeqCst);
+        let path = isolated_trajectory_store("clean-trajectory");
         let accepted = handle_trajectory(
-            r#"{"record":{"themes":["daily movement"],"commitments":[{"text":"morning walk"}],"follow_ups":["Try this once on your own."]}}"#,
+            r#"{"record":{"themes":["daily movement"],"commitments":[{"text":"morning walk","status":"open"}],"follow_ups":["Try this once on your own."],"autonomy_delta":{"logged":true,"signals":["self_initiated"],"direction":"client_led"},"next_touch":"2026-06-30"}}"#,
         );
         assert_eq!(accepted["ok"], true, "{accepted}");
-        assert_eq!(accepted["count"].as_u64().unwrap(), (before + 1) as u64);
+        assert_eq!(accepted["count"], 1, "{accepted}");
+        assert_eq!(accepted["trajectory_id"], "local-000001", "{accepted}");
+        let line = std::fs::read_to_string(&path).unwrap();
+        let stored: Value = serde_json::from_str(line.trim()).unwrap();
+        assert_eq!(stored["schema"], "airplane.trajectory.v1");
+        assert_eq!(stored["state"]["themes"][0], "daily movement");
+        assert_eq!(stored["action"]["follow_up"], "Try this once on your own.");
+        assert_eq!(
+            stored["reward"]["autonomy_delta"]["signals"][0],
+            "self_initiated"
+        );
+        assert_eq!(stored["next_state"]["follow_up_sent"], true);
+        assert!(!line.contains("Maria Alvarez"), "{line}");
+        assert!(!line.contains("redaction"), "{line}");
+    }
+
+    #[test]
+    fn trajectory_count_recovers_from_jsonl() {
+        let _guard = TRAJECTORY_TEST_LOCK.lock().unwrap();
+        let path = isolated_trajectory_store("trajectory-count");
+        std::fs::write(
+            &path,
+            r#"{"schema":"airplane.trajectory.v1","trajectory_id":"local-000001"}
+"#,
+        )
+        .unwrap();
+        let accepted = handle_trajectory(
+            r#"{"record":{"themes":["daily movement"],"commitments":[{"text":"morning walk","status":"open"}],"follow_ups":["Try this once on your own."]}}"#,
+        );
+        assert_eq!(accepted["ok"], true, "{accepted}");
+        assert_eq!(accepted["count"], 2, "{accepted}");
+        assert_eq!(accepted["trajectory_id"], "local-000002", "{accepted}");
     }
 
     #[test]
     fn trajectory_gate_rejects_empty_or_invalid_records() {
         let _guard = TRAJECTORY_TEST_LOCK.lock().unwrap();
-        let before = TRAJECTORY_COUNT.load(Ordering::SeqCst);
+        let path = isolated_trajectory_store("invalid-trajectory");
         let invalid = handle_trajectory(r#"{"#);
         let empty =
             handle_trajectory(r#"{"record":{"themes":[],"commitments":[],"follow_ups":[]}}"#);
         assert_eq!(invalid["ok"], false, "{invalid}");
         assert_eq!(empty["ok"], false, "{empty}");
-        assert_eq!(TRAJECTORY_COUNT.load(Ordering::SeqCst), before);
+        assert!(!path.exists());
     }
 }

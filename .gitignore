@@ -26,6 +26,7 @@ venv/
 .env
 .env.*
 *.local
+.airplane/
 
 # OS / tooling
 .DS_Store
