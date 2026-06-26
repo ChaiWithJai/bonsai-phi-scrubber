@@ -41,6 +41,12 @@ swift test
 swift build
 ```
 
+From the repo root, the same simulator-safe check is:
+
+```bash
+./run.sh ios-sim
+```
+
 To inspect the UI scaffold, open `Package.swift` in Xcode, add `AirplaneDemoView()` to a local
 preview or host app, and run it in a simulator. Use the segmented control at the top of the view
 to switch between `MLX Swift mock` and `Edge HTTP mock` before capture.

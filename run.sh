@@ -15,6 +15,7 @@ case "$verb" in
   gates-fast) build; "$BIN" gates-fast; ./scripts/smoke-ethical-gate-fixtures.sh --bin "$BIN" ;;
   web)    cargo build -q --bin airplane-web; target/debug/airplane-web ;;
   mcp)    cargo build -q --bin airplane-mcp; target/debug/airplane-mcp ;;
+  ios-sim) (cd shells/ios && swift test && swift build) ;;
   slack-smoke) shift; ./scripts/smoke-slack-sink.sh "$@" ;;
   help|*) cat <<'EOF'
 Airplane Mode — run.sh   (on-device PHI scrubber; CLI shell over airplane-core)
@@ -25,6 +26,7 @@ Airplane Mode — run.sh   (on-device PHI scrubber; CLI shell over airplane-core
   ./run.sh gates-fast      run no-model policy/provenance gates for fast iteration
   ./run.sh web             serve the Beat 1 demo UI (default http://localhost:8099, LAN-accessible)
   ./run.sh mcp             start the stdio MCP shell (agent-callable scrub tool)
+  ./run.sh ios-sim         verify the simulator-safe iOS shell scaffold (no hardware proof)
   ./run.sh slack-smoke     post one synthetic gate-clean record through the Slack sink
 
 Needs the model layer running:  ./scripts/serve-model.sh

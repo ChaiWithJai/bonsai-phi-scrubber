@@ -134,6 +134,15 @@ In the UI:
 The phone is a touchscreen for this web build. The laptop is the current edge
 node. The native iPhone shell is tracked separately.
 
+To verify the simulator-safe iOS scaffold and backend selector, run:
+
+```bash
+./run.sh ios-sim
+```
+
+That command runs SwiftPM tests/build for the mock `mlx-swift` and edge-HTTP
+backend modes. It does not prove real iPhone 11/A13 inference.
+
 ## Wire Slack For A Real Post
 
 Without Slack credentials, the app still demos the scrub and verifier path, but
@@ -343,10 +352,12 @@ real iPhone 11 hardware proof.
 | `shells/web/` | Phone-driven demo UI and local web shell. |
 | `shells/cli/` | Eval, gates, and command-line scrub path. |
 | `shells/mcp/` | Agent-callable interface over the same core. |
+| `shells/ios/` | Simulator-safe native scaffold with selectable backend mocks. |
 | `packs/coach-session/` | Reference pack and synthetic eval set. |
 | `docs/model-setup.md` | Model download/runtime details. |
 | `docs/contracts/` | Shared JSON contract fixtures for shell/backend interoperability. |
 | `docs/demo/onboarding.md` | Phone demo and Slack runbook. |
+| `docs/demo/reference-architecture.md` | CNCF-style adopter/builder reference architecture. |
 | `docs/extending.md` | Pack extension walkthrough. |
 | `docs/demo/how-the-demo-works.md` | Architecture, topology, workload profile, worked examples. |
 | `docs/positioning/cncf-end-user-and-inference-ecosystem.md` | Audience split: adopter outcome language vs. builder mechanism language. |

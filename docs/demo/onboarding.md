@@ -11,6 +11,8 @@ after you have seen the demo run once.
 
 For architecture, network topology, and data-flow diagrams, see
 [`docs/demo/system-network-data-flows.md`](system-network-data-flows.md).
+For the adopter/builder reference architecture, see
+[`docs/demo/reference-architecture.md`](reference-architecture.md).
 For a narrative walkthrough, verification guide, workload profile, and worked examples,
 see [`docs/demo/how-the-demo-works.md`](how-the-demo-works.md).
 
