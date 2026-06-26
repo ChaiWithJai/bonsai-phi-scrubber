@@ -96,11 +96,12 @@ Built as a **harnessed loop** (`AGENTS.md` + `backlog/` + `gates/`), reproducibl
 | Path | What |
 |---|---|
 | `crates/airplane-core/` | the portable Rust trust core (rules · gate · pipeline · pack loader) |
-| `shells/web/` · `shells/cli/` | the live Beat 1 demo · the reproduction front door |
+| `shells/web/` · `shells/cli/` · `shells/mcp/` | the live Beat 1 demo · the reproduction front door · the agent-callable shell |
 | `packs/coach-session/` | the reference pack + 20 golden notes |
 | `eval/golden-run.txt` | the committed reproduction target |
 | `docs/` | model setup · phone runbook · extending guide · architecture spec |
 | `files/` · `CANON.md` | the design canon (RFCs, ADRs) and its index |
-| `run.sh` | one entrypoint: `eval · scrub · gates · web` |
+| `run.sh` | one entrypoint: `eval · scrub · gates · web · mcp` |
+| `scripts/smoke-mcp-cli-parity.sh` | MCP-vs-CLI parity smoke over golden notes |
 
 *Built to make intelligence come to the data — not the other way around.*
