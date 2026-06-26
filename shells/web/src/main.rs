@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-const PACK_DIR: &str = "packs/coach-session";
+const DEFAULT_PACK_DIR: &str = "packs/coach-session";
 const INDEX: &str = "shells/web/static/index.html";
 const DEFAULT_ADDR: &str = "0.0.0.0:8088";
 const PASSES: u32 = 5;
@@ -34,7 +34,11 @@ fn repo_path(rel: &str) -> PathBuf {
 }
 
 fn pack_path() -> PathBuf {
-    repo_path(PACK_DIR)
+    let rel = std::env::var("PACK")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| DEFAULT_PACK_DIR.to_string());
+    repo_path(&rel)
 }
 
 // ---- llama-server adapter (InferenceProvider port, web side) -----------------

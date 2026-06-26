@@ -26,6 +26,7 @@ cargo test -p airplane-web
 cargo clippy -p airplane-web --all-targets -- -D warnings
 ./run.sh gates
 ./scripts/smoke-mcp-cli-parity.sh
+PACK=packs/coach-session MCP_PARITY_LIMIT=1 ./scripts/smoke-mcp-cli-parity.sh
 (cd shells/ios && swift test)
 ```
 
@@ -42,7 +43,7 @@ The current committed eval target is `eval/golden-run.txt`:
 
 | Issue | Review state | Evidence |
 |---|---|---|
-| #1 Pack reveal | Covered for demo | Real `recognizers/benefits.json` is wired in `pack.yaml`; `note-21` eval catches `BEN-MH-7741`; `/api/pack-demo` shows five pack surfaces, baseline miss, real-pack catch, and pack eval smoke. |
+| #1 Pack reveal | Covered for demo | Real `recognizers/benefits.json` is wired in `pack.yaml`; `note-21` eval catches `BEN-MH-7741`; `/api/pack-demo` shows five pack surfaces, baseline miss, real-pack catch, and pack eval smoke. `PACK=` is honored by CLI, web, MCP, and parity smoke; invalid pack paths fail closed at load. |
 | #2 Reward-lint | Covered | `Pack::validate_reward_lint`; `./run.sh gates`; web/CLI tests. |
 | #3 Scope-boundary | Covered | `Pack::validate_scope_boundary`; `./run.sh gates`; escalation policy in `policy.yaml`. |
 | #4 Follow-up/autonomy | MVP covered | Web structurer emits client-paced follow-up and autonomy signals; clinical-risk language surfaces escalation. Not a trained policy. |

@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
 
-const PACK_DIR: &str = "packs/coach-session";
+const DEFAULT_PACK_DIR: &str = "packs/coach-session";
 const TOOL_NAME: &str = "airplane_scrub";
 
 struct LlamaServer {
@@ -68,6 +68,14 @@ fn repo_path(rel: &str) -> PathBuf {
     }
 }
 
+fn pack_path() -> PathBuf {
+    let rel = std::env::var("PACK")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| DEFAULT_PACK_DIR.to_string());
+    repo_path(&rel)
+}
+
 fn tool_descriptor() -> Value {
     json!({
         "name": TOOL_NAME,
@@ -90,7 +98,9 @@ fn scrub_payload(args: &Value, provider: &dyn InferenceProvider) -> Result<Value
         .context("airplane_scrub requires string argument `text`")?;
     let passes = args["passes"].as_u64().unwrap_or(3).clamp(1, 8) as u32;
 
-    let pack = Pack::load(&repo_path(PACK_DIR)).context("load coach-session pack")?;
+    let pack_path = pack_path();
+    let pack =
+        Pack::load(&pack_path).with_context(|| format!("load pack {}", pack_path.display()))?;
     let res = scrub(text, &pack.rules, Some(provider), Sampling::eval(), passes)?;
 
     let redactions: Vec<Value> = res

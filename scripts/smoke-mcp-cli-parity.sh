@@ -5,7 +5,8 @@ cd "$(dirname "$0")/.."
 
 passes="${MCP_PARITY_PASSES:-3}"
 limit="${MCP_PARITY_LIMIT:-3}"
-golden_dir="packs/coach-session/eval/golden"
+pack_dir="${PACK:-packs/coach-session}"
+golden_dir="$pack_dir/eval/golden"
 
 cargo build -q --bin airplane --bin airplane-mcp
 

@@ -12,8 +12,16 @@ use airplane_core::{
 use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 
-const PACK_DIR: &str = "packs/coach-session";
+const DEFAULT_PACK_DIR: &str = "packs/coach-session";
 const GOLDEN_RUN: &str = "eval/golden-run.txt";
+
+fn pack_dir() -> PathBuf {
+    std::env::var("PACK")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(DEFAULT_PACK_DIR))
+}
 
 // ---- the llama-server adapter (the InferenceProvider port, CLI side) ----------
 
@@ -98,8 +106,9 @@ fn eval_passes() -> u32 {
 }
 
 fn run_eval(use_model: bool) -> Result<EvalOutcome> {
-    let pack_dir = Path::new(PACK_DIR);
-    let pack = Pack::load(pack_dir).context("load coach-session pack")?;
+    let pack_dir = pack_dir();
+    let pack =
+        Pack::load(&pack_dir).with_context(|| format!("load pack {}", pack_dir.display()))?;
     let golden = pack_dir.join("eval/golden");
     let expected = pack_dir.join("eval/expected");
     let provider = LlamaServer::default();
@@ -221,7 +230,9 @@ fn cmd_eval() -> Result<()> {
 // ---- scrub -------------------------------------------------------------------
 
 fn cmd_scrub(text: &str) -> Result<()> {
-    let pack = Pack::load(Path::new(PACK_DIR))?;
+    let pack_dir = pack_dir();
+    let pack =
+        Pack::load(&pack_dir).with_context(|| format!("load pack {}", pack_dir.display()))?;
     let provider = LlamaServer::default();
     let res = scrub(text, &pack.rules, Some(&provider), Sampling::eval(), 3)?;
     println!("scrubbed : {}", res.scrubbed_text);
@@ -243,7 +254,7 @@ fn cmd_scrub(text: &str) -> Result<()> {
 // ---- gates -------------------------------------------------------------------
 
 fn cmd_gates() -> Result<()> {
-    let pack_dir = PathBuf::from(PACK_DIR);
+    let pack_dir = pack_dir();
     let mut failed = false;
 
     // pack-blindness (structural, no model)

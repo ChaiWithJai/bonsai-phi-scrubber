@@ -24,6 +24,7 @@ Airplane Mode — run.sh   (on-device PHI scrubber; CLI shell over airplane-core
 
 Needs the model layer running:  ./scripts/serve-model.sh
 Tune contextual passes:         AIRPLANE_EVAL_PASSES=5 ./run.sh eval
+Use a different pack:           PACK=packs/my-pack ./run.sh gates
 EOF
   ;;
 esac
