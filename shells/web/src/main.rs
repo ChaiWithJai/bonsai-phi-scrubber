@@ -940,6 +940,7 @@ fn main() -> Result<()> {
 
     for mut req in server.incoming_requests() {
         let url = req.url().to_string();
+        let path = url.split('?').next().unwrap_or(url.as_str()).to_string();
         let method = req.method().to_string();
         let json_header =
             tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap();
@@ -947,7 +948,7 @@ fn main() -> Result<()> {
             tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"text/html; charset=utf-8"[..])
                 .unwrap();
 
-        match (method.as_str(), url.as_str()) {
+        match (method.as_str(), path.as_str()) {
             ("GET", "/") => {
                 let html = std::fs::read_to_string(INDEX)
                     .unwrap_or_else(|_| "<h1>index.html missing</h1>".into());
