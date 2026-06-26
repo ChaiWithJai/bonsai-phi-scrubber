@@ -1,107 +1,348 @@
 # Airplane Mode
 
-**De-identify a sensitive note on the edge — and let only a clean record leave.** A 1-bit PrismML **Bonsai** model scrubs a (synthetic) mental-health coaching session locally; a **verifier gate** refuses to send anything until it's provably clean; only the de-identified record reaches Slack.
+Build a healthcare hackathon demo where a sensitive note is scrubbed at the edge,
+verified before egress, and only a de-identified care record reaches Slack.
 
-> "AI's future will not be defined by who can build the largest datacenters. It will be defined by who can deliver the most intelligence per unit of energy and cost." — Vinod Khosla
+This repo is for people who already run messy real-world workflows: automations,
+scripts, Google Sheets glue, intake forms, Zapier-style handoffs, or EHR-adjacent
+workarounds. You do not need to be a Rust expert. You do need to be willing to run
+terminal commands and keep the demo synthetic.
 
-The bet: the most sensitive workloads should run **where the data already is**, not shipped to a datacenter. This repo makes that bet *watchable* — and hands an application developer the **pattern** to apply it to their own vertical.
+## What This Demo Proves
 
----
+The core pattern is simple:
 
-## What's shipped vs. the vision (read this first)
+```text
+synthetic note -> local scrubber -> verifier gate -> clean Slack record
+```
 
-**Shipped — Beat 1, runnable today.** A phone-driven web demo: you dictate a note on your phone, it's scrubbed on a **local edge node** (your laptop, running Bonsai offline), the verifier gate blocks egress until the output is provably clean, and the de-identified record posts to Slack for real.
-*Honest scope:* in this web build the "device" is the **laptop-as-edge**; the phone is the touchscreen, and "airplane mode" is a **simulated** egress toggle — not the literal radios-off proof. Why, and what we traded, is recorded in **[ADR-015](files/adr-015-airplane-mode-simulated-in-web-demo.md)**.
+The raw note is captured in a phone browser, but the compute runs on your laptop
+as the local edge node. A PrismML Bonsai model helps identify PHI-like text. The
+model output is not trusted raw: the Rust core parses, clamps, redacts, and then
+re-scans the exact outbound Slack payload before anything leaves.
 
-**The vision — next.** The same core on a **native iPhone** (mlx-swift), where airplane mode is the *literal, tamper-evident* proof: radios physically off, nothing can transmit. The architecture is built for exactly this — the scrub logic is one portable Rust core and the phone is just another shell ([issue #9](../../issues/9)).
+This is not a production medical device, not HIPAA compliance in a box, and not
+the final iPhone airplane-mode proof. It is a starter template for learning how
+to structure healthcare AI workflows so sensitive data has a real boundary.
 
-The demo *is* the trust boundary, made watchable. Its architecture *is* the pitch: the sensitive workload is **one portable, owned core**; everything platform-specific is a swappable adapter — the literal shape of pulling a workload off the datacenter and repatriating it to the edge.
+## Who Should Use This
 
----
+Use this if you are:
 
-## Reproduce the numbers (the trust mechanism)
+- Building at a healthcare hackathon.
+- Tired of EHR copy/paste work and want a safer automation pattern.
+- Comfortable enough with scripts to follow a runbook.
+- Managing a complex workflow in spreadsheets and wondering what should become
+  software.
+- Trying to understand how Codex or Claude Code can help you maintain a repo with
+  tests, gates, docs, and demo workflows.
 
-Belief shouldn't come from a pitch — it comes from `./run.sh eval` printing the same numbers on **your** laptop that we claim on ours, against the golden notes committed in this repo.
+Do not put real patient data, real member IDs, or real session notes into this
+demo. The repo and eval set are synthetic-only.
+
+## Machine Requirements
+
+The smooth path is an Apple Silicon Mac.
+
+| Need | Recommendation | Why |
+| --- | --- | --- |
+| Computer | Apple Silicon Mac, 16 GB RAM or more | Runs the local model through Metal. |
+| Disk | 8-10 GB free | The default Bonsai GGUF is about 3.2 GB; builds use more. |
+| OS tools | Homebrew, Git, Rust, `jq` | Build, run, inspect status JSON. |
+| Model runtime | `llama.cpp` with `llama-server` | Serves Bonsai on `127.0.0.1:8080`. |
+| Browser | Safari/Chrome on laptop or phone | Runs the local web UI. |
+| Phone | Optional, same Wi-Fi/hotspot as laptop | Makes the demo feel like capture at the edge. |
+| Slack | Optional but recommended | Shows real, gated egress to `#coach-records`. |
+
+Linux can work for CLI/model reproduction if you build/install `llama.cpp`, but
+the Slack secret helper uses macOS Keychain. Windows is not the supported path
+for this starter.
+
+Install the basic tools:
 
 ```bash
-git clone https://github.com/ChaiWithJai/airplane-mode && cd airplane-mode
+brew install git rust llama.cpp jq gh
+```
 
-# 1. get + serve the model (one-time; ~5 min). See docs/model-setup.md for details.
-./scripts/serve-model.sh            # downloads pinned Ternary-Bonsai-1.7B + verifies sha256 + serves on :8080
+If you just created a GitHub account, install GitHub CLI, then authenticate:
 
-# 2. check the committed de-identification numbers through the owned Rust core
+```bash
+gh auth login
+```
+
+You only need GitHub authentication if you plan to fork, push changes, or open
+pull requests. Running the demo locally does not require it.
+
+## Quick Start: Run The Core Demo
+
+Clone the repo:
+
+```bash
+git clone https://github.com/ChaiWithJai/airplane-mode.git
+cd airplane-mode
+```
+
+Start the local Bonsai model server in terminal 1:
+
+```bash
+./scripts/serve-model.sh
+```
+
+The first run downloads the pinned model and verifies its SHA-256 before serving.
+Leave this terminal open. The model API will listen at:
+
+```text
+http://127.0.0.1:8080/v1/chat/completions
+```
+
+Start the web demo in terminal 2:
+
+```bash
+./run.sh web
+```
+
+The server prints URLs like:
+
+```text
+local: http://localhost:8099
+phone: http://192.168.x.x:8099
+```
+
+Open `http://localhost:8099` on your laptop, or open the printed `phone:` URL on
+a phone connected to the same Wi-Fi. If the phone is on the Mac's Personal
+Hotspot, use the hotspot IP printed by the server.
+
+In the UI:
+
+1. Tap **Use sample note** or dictate a synthetic note.
+2. Tap **Scrub on device**.
+3. Watch identifiers get removed.
+4. Continue through the verifier gate.
+5. Send the clean care record to Slack, or run in preview mode if Slack is not
+   configured.
+
+The phone is a touchscreen for this web build. The laptop is the current edge
+node. The native iPhone shell is tracked separately.
+
+## Wire Slack For A Real Post
+
+Without Slack credentials, the app still demos the scrub and verifier path, but
+the final send stays in preview. To make the clean record post for real, use an
+incoming webhook.
+
+1. Create a Slack app from `slack-app-manifest.yaml`.
+2. Enable Incoming Webhooks in Slack.
+3. Add a webhook for `#coach-records`.
+4. Store it locally:
+
+```bash
+scripts/setup-slack-secret.sh webhook
+./run.sh web
+```
+
+The secret goes into macOS Keychain. Do not commit webhook URLs or bot tokens.
+
+Check status:
+
+```bash
+curl http://127.0.0.1:8099/api/status | jq '{slack:.slack, model:.model}'
+```
+
+Expected for a live demo:
+
+```json
+{
+  "slack": {
+    "channel": "#coach-records",
+    "configured": true,
+    "route": "webhook"
+  },
+  "model": {
+    "reachable": true,
+    "route": "llama-server",
+    "url": "http://127.0.0.1:8080/v1/chat/completions"
+  }
+}
+```
+
+Smoke test the Slack sink:
+
+```bash
+AIRPLANE_WEB_URL=http://127.0.0.1:8099 ./run.sh slack-smoke
+```
+
+## Reproduce The Trust Claim
+
+The committed eval target is `eval/golden-run.txt`. It uses 21 synthetic notes
+and 5 seeded Bonsai passes per note: 105 local model calls.
+
+Run the full eval:
+
+```bash
 ./run.sh eval
 ```
 
-You should see **rules ∪ Bonsai-1.7B → 100% recall / 0 leakage** on the 21-note synthetic golden set — the same `airplane-core` the demo runs. `./run.sh eval` compares the run to the committed `eval/golden-run.txt`; use `./run.sh eval --update` only when intentionally refreshing that target. Full setup, including the model footguns, is in **[docs/model-setup.md](docs/model-setup.md)**.
+Expected headline:
 
-> Needs: a Mac (or Linux), the Rust toolchain, and `llama.cpp` (`brew install llama.cpp`). The model is **free under Apache 2.0** from `prism-ml/` on Hugging Face and is fetched from a pinned repo commit with SHA-256 verification.
+```text
+recall 100.0%
+leakage 0
+```
 
----
-
-## Run the phone demo (Beat 1)
+This can take a while because model inference dominates the runtime. For normal
+UI/docs/Slack iteration, use the fast non-model gates:
 
 ```bash
-./scripts/serve-model.sh    # the model (terminal 1)
-AIRPLANE_WEB_ADDR=0.0.0.0:8099 ./run.sh web   # the UI (terminal 2) — prints a LAN URL
+./run.sh gates-fast
 ```
 
-Open the printed `http://<laptop-ip>:8099` on a phone on the same Wi-Fi (or your iPhone hotspot — see the runbook). Dictate → **Scrub on device** → the name/ID/date/relationship get caught → the gate clears → the de-identified card **posts to Slack**. The full runbook, the Wi-Fi-isolation fix, and the 2-minute Slack-webhook setup are in **[docs/demo/onboarding.md](docs/demo/onboarding.md)**.
+Use the full gates before release:
 
----
-
-## Make it yours — five files, no fork (extendability)
-
-The hard, correctness-critical core is built and gated **once**. Everything specific to *your* practice or vertical is a **pack** — five declarative files, **no code**:
-
+```bash
+./run.sh gates
 ```
+
+You can bound slow model requests:
+
+```bash
+AIRPLANE_MODEL_TIMEOUT_SECS=120 ./run.sh gates
+```
+
+## Extend The Template For Your Hackathon
+
+Most healthcare hackathon ideas should start by changing the pack, not the Rust
+core.
+
+The reference pack lives here:
+
+```text
 packs/coach-session/
-├── recognizers/   your identifiers (member IDs, partner orgs)
-├── schema.yaml    your record shape
-├── policy.yaml    what to redact · recall threshold · the reward rules
-├── sink.yaml      where clean records go (credential sourced, never stored)
-└── eval/          your golden notes — proves it doesn't leak
+├── recognizers/   known identifier formats, like member IDs
+├── schema.yaml    the clean care record shape
+├── policy.yaml    redaction policy, reward rules, escalation boundary
+├── sink.yaml      where clean records go
+└── eval/          synthetic golden notes and expected redactions
 ```
 
-Copy the reference pack, edit five files for your identifiers, run the eval gate (it **must pass** before it ships), and you're running the identical signed core with your data. A pack can't see raw input, the redaction map, or the gate — so it's safe to write and safe to share. **Walkthrough: [docs/extending.md](docs/extending.md).**
+Make your own pack:
 
----
-
-## The architecture (one core, many shells)
-
-```
-        airplane-core  (Rust · portable · the "repatriated workload")
-        rules executor · verifier gate · pipeline · pack loader
-        depends only on PORTS:  InferenceProvider · SecureStore · Capture · Sink
-                 ▲                      ▲                       ▲
-         web shell (live)          CLI shell             MCP · iOS (planned)
-        browser · laptop-edge  llama-server · file      same core, more reach
-        "Beat 1, on any phone"  "numbers reproduce"     "an agent / a device too"
+```bash
+cp -R packs/coach-session packs/my-hackathon-pack
 ```
 
-The **identical** recall-critical logic runs across every shell — which is what makes a reproduced number meaningful and the repatriation real, not asserted. The model is an `InferenceProvider` **port**, not baked in ([ADR-014](files/adr-014-portable-rust-core.md)). Today only `InferenceProvider` is wired; `SecureStore`/`Capture`/`Sink` are the contract the native on-device shell will fulfill.
+Then edit:
 
----
+- `recognizers/` for local identifier formats your workflow knows about.
+- `schema.yaml` for the structured record you want after scrubbing.
+- `policy.yaml` for recall threshold, escalation path, and autonomy-only reward
+  rules.
+- `sink.yaml` for the destination channel or route.
+- `eval/golden/*.txt` and `eval/expected/*.json` with synthetic examples.
 
-## Honest about the model
+Run your pack:
 
-We don't overclaim Bonsai: PrismML's "intelligence density" is a **self-coined** metric that loses on raw benchmarks; "1-bit" is **sign-only weights with grouped scale factors**; frontier cloud still wins peak quality. The bet isn't that this beats GPT — it's that **the most sensitive work should run where the data lives**, and a 1-bit model makes that possible on hardware you already own.
+```bash
+PACK=packs/my-hackathon-pack ./run.sh eval
+PACK=packs/my-hackathon-pack ./run.sh gates
+```
 
----
+If the gate fails, fix the pack or expected labels. Do not weaken the verifier
+to make a demo pass.
 
-## How this was built · what's next
+## Common Hackathon Adaptations
 
-Built as a **harnessed loop** (`AGENTS.md` + `backlog/` + `gates/`), reproducible end-to-end. The design canon lives in `files/` and is indexed by **[CANON.md](CANON.md)**; the architecture decisions are ADR-001…015. The remaining work — Beat 2 (the five-file reveal), the two ethical gates, the follow-up loop, the native iOS shell — is tracked in the **[issues](../../issues)**.
+Here are realistic starter ideas:
 
-| Path | What |
-|---|---|
-| `crates/airplane-core/` | the portable Rust trust core (rules · gate · pipeline · pack loader) |
-| `shells/web/` · `shells/cli/` · `shells/mcp/` | the live Beat 1 demo · the reproduction front door · the agent-callable shell |
-| `packs/coach-session/` | the reference pack + 20 golden notes |
-| `eval/golden-run.txt` | the committed reproduction target |
-| `docs/` | model setup · phone runbook · extending guide · architecture spec |
-| `files/` · `CANON.md` | the design canon (RFCs, ADRs) and its index |
-| `run.sh` | one entrypoint: `eval · scrub · gates · web · mcp` |
-| `scripts/smoke-mcp-cli-parity.sh` | MCP-vs-CLI parity smoke over golden notes |
+- Intake note to care-team Slack summary.
+- Referral form scrubber before it enters a shared tracker.
+- De-identified coaching recap for a community health worker.
+- Benefits navigation note that strips member IDs before routing.
+- Synthetic EHR discharge-summary exercise where only safe follow-ups leave.
 
-*Built to make intelligence come to the data — not the other way around.*
+For each one, ask:
+
+1. What raw text is sensitive?
+2. What identifiers must never leave?
+3. What clean record is useful after redaction?
+4. What sink receives only the clean record?
+5. What synthetic eval notes prove it works?
+
+## Where Codex And Claude Code Fit
+
+This repo is designed for agent-assisted development. The useful pattern is not
+"ask an AI to make an app." The useful pattern is:
+
+- Keep the repo as the system of record.
+- Put tasks in issues/backlog.
+- Add gates that fail when trust boundaries break.
+- Ask Codex or Claude Code to make small changes.
+- Run the same checks every time.
+- Commit and review the diff.
+
+If you already maintain automations or spreadsheet workflows, think of this as
+turning your gluework into a versioned workflow with tests.
+
+## Architecture Map
+
+```text
+airplane-core
+  Rust trust core
+  rules executor · verifier gate · pipeline · pack loader
+  depends on ports, not platforms
+
+shells/web
+  live phone/laptop demo
+
+shells/cli
+  reproducibility front door
+
+shells/mcp
+  agent-callable shell
+
+packs/coach-session
+  reference healthcare coaching pack
+```
+
+The model is a port. Bonsai is useful because it is small enough to make local
+edge inference plausible, but the verifier gate is what decides whether anything
+can leave.
+
+## Troubleshooting
+
+| Symptom | Fix |
+| --- | --- |
+| `llama-server not found` | Run `brew install llama.cpp`. |
+| Model download fails | Check network access and rerun `./scripts/serve-model.sh`. |
+| Web page loads but model says off | Start `./scripts/serve-model.sh` and leave it running. |
+| Phone cannot load demo | Use the printed `phone:` URL, same Wi-Fi, or Mac Personal Hotspot. Do not use `127.0.0.1` on the phone. |
+| Slack says preview | Configure webhook or bot token; check `/api/status`. |
+| Send fails but edge is reachable | Retry; sends are idempotent by `send_id` to avoid duplicate Slack posts. |
+| Eval takes too long | Use `./run.sh gates-fast` for non-model iteration; reserve full eval/gates for release proof. |
+
+## Repository Guide
+
+| Path | Purpose |
+| --- | --- |
+| `crates/airplane-core/` | Portable Rust trust core. |
+| `shells/web/` | Phone-driven demo UI and local web shell. |
+| `shells/cli/` | Eval, gates, and command-line scrub path. |
+| `shells/mcp/` | Agent-callable interface over the same core. |
+| `packs/coach-session/` | Reference pack and synthetic eval set. |
+| `docs/model-setup.md` | Model download/runtime details. |
+| `docs/demo/onboarding.md` | Phone demo and Slack runbook. |
+| `docs/extending.md` | Pack extension walkthrough. |
+| `docs/demo/how-the-demo-works.md` | Architecture, topology, workload profile, worked examples. |
+| `AGENTS.md` | Harnessed build loop and hard rules. |
+| `CANON.md` | Design canon index. |
+
+## Safety Boundaries
+
+- Synthetic data only.
+- Raw note and redaction map never go to Slack.
+- Slack and trajectory storage are behind the verifier gate.
+- Packs are declarative and code-free.
+- The current web demo uses the laptop as the edge node.
+- Native iPhone, real airplane-mode proof, and encrypted trajectory storage are
+  tracked as future work.
+
+Built to make sensitive workflows easier to inspect, reproduce, and improve.
