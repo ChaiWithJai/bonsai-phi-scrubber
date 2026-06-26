@@ -74,6 +74,11 @@
   .sinkLine{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:13px;border-top:1px solid #eadfca;padding-top:11px}
   .sinkBadges{display:flex;align-items:center;gap:5px;flex:none}
   .sinkState{font:700 10px var(--mono);letter-spacing:0;border-radius:999px;padding:5px 8px;border:1px solid}
+  .jobbar{border:1px solid #eadfca;background:#fffaf0;border-radius:12px;padding:8px 10px;margin-bottom:10px;
+    display:flex;align-items:center;justify-content:space-between;gap:10px;font:700 10px var(--mono);color:#736c5d}
+  .jobbar b{font:800 10px var(--mono);color:var(--green);letter-spacing:0}
+  .jobbar.fail b{color:var(--red)}
+  .jobbar.run b{color:var(--amber)}
   .sampleBtn{font:700 12px var(--sans);color:var(--gold);background:#f6ecd6;border:1px solid #e3c98a;border-radius:999px;padding:8px 11px;cursor:pointer}
   .noteMeta{display:flex;align-items:center;justify-content:space-between;margin-top:10px}
   .btn.disabled{background:#d9d0bd;color:#8a8273;cursor:default;box-shadow:none}
@@ -102,7 +107,10 @@
 
 <script>
 const NOTE = "Met with Maria Alvarez (CM-204815) at her place Tuesday. She's the one whose daughter just started college. Committed to a 10-min morning walk daily.";
-const S = { screen:'capturing', note:'', result:null, error:null, posted:false, sendNote:'', trajectoryCount:0, trajectoryNote:'', packDemo:null, packError:null, listening:false, speechMsg:'', status:null };
+const STEPS = new Set(['capturing','scrubbing','gated','record','flush','delivered','pack']);
+const RESULT_STEPS = new Set(['gated','record','flush','delivered','pack']);
+const DRAFT_KEY = 'airplane-demo-draft-v2';
+const S = { screen:'capturing', note:'', result:null, error:null, posted:false, sendNote:'', trajectoryCount:0, trajectoryNote:'', packDemo:null, packError:null, listening:false, speechMsg:'', status:null, job:null };
 let recognizer = null;
 
 const $phone = document.getElementById('phone');
@@ -335,17 +343,99 @@ const screens = {
 // ---------- helpers ----------
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function setDark(on,green){ $phone.classList.toggle('dark',!!on); $phone.classList.toggle('green',!!green); }
-function go(name){ S.screen=name; render(); }
+
+function sanitizeResultForDraft(r){
+  if(!r) return null;
+  return {
+    scrubbed_text:r.scrubbed_text||'',
+    gate_pass:!!r.gate_pass,
+    residual_count:r.residual_count||0,
+    record:r.record||null,
+    redactions:(r.redactions||[]).map(x=>({entity:x.entity||'OTHER',layer:x.layer||'unknown',text:'[held locally]'}))
+  };
+}
+
+function saveDraft(){
+  try{
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
+      note:S.note,
+      result:sanitizeResultForDraft(S.result),
+      posted:S.posted,
+      sendNote:S.sendNote,
+      trajectoryCount:S.trajectoryCount,
+      trajectoryNote:S.trajectoryNote
+    }));
+  }catch(_){}
+}
+
+function loadDraft(){
+  try{
+    const raw=sessionStorage.getItem(DRAFT_KEY);
+    if(!raw) return;
+    const d=JSON.parse(raw);
+    S.note=d.note||'';
+    S.result=d.result||null;
+    S.posted=!!d.posted;
+    S.sendNote=d.sendNote||'';
+    S.trajectoryCount=d.trajectoryCount||0;
+    S.trajectoryNote=d.trajectoryNote||'';
+  }catch(_){}
+}
+
+function routeStep(){
+  const step=new URLSearchParams(location.search).get('step')||'capturing';
+  if(!STEPS.has(step)) return 'capturing';
+  if(RESULT_STEPS.has(step) && !S.result) return 'capturing';
+  if(step==='flush') return S.result ? 'record' : 'capturing';
+  return step;
+}
+
+function writeRoute(step, replace){
+  const url=new URL(location.href);
+  if(step==='capturing') url.searchParams.delete('step');
+  else url.searchParams.set('step', step);
+  const next=url.pathname+url.search+url.hash;
+  if(next !== location.pathname+location.search+location.hash){
+    history[replace?'replaceState':'pushState']({step},'',next);
+  }
+}
+
+function go(name, opts={}){
+  if(!STEPS.has(name)) name='capturing';
+  if(RESULT_STEPS.has(name) && !S.result) name='capturing';
+  S.screen=name;
+  writeRoute(name, !!opts.replace);
+  saveDraft();
+  render();
+}
+
+function setJob(kind,status,detail){
+  const now=Date.now();
+  S.job={id:(S.job&&S.job.kind===kind)?S.job.id:`${kind}-${now}`,kind,status,detail:detail||'',startedAt:(S.job&&S.job.kind===kind)?S.job.startedAt:now,updatedAt:now};
+  render();
+}
+
+function clearJobSoon(){
+  setTimeout(()=>{ if(S.job && S.job.status!=='running' && S.job.status!=='retrying'){ S.job=null; render(); } }, 2600);
+}
+
+function jobHtml(){
+  if(!S.job) return '';
+  const age=Math.max(0,Math.round((Date.now()-S.job.startedAt)/1000));
+  const cls=S.job.status==='failed'?'fail':(S.job.status==='running'||S.job.status==='retrying'?'run':'');
+  const edge=S.status&&S.status.slack?`${S.status.slack.route} · model ${S.status.model&&S.status.model.reachable?'ready':'off'}`:'checking edge';
+  return `<div class="jobbar ${cls}"><span>${esc(S.job.kind)} · ${esc(S.job.detail||edge)}</span><b>${esc(S.job.status)} · ${age}s</b></div>`;
+}
 
 function render(){
-  $screen.innerHTML = screens[S.screen]();
+  $screen.innerHTML = jobHtml() + screens[S.screen]();
   $screen.querySelectorAll('[data-act]').forEach(el=>el.addEventListener('click',onAct));
 }
 
 async function onAct(e){
   const act = e.currentTarget.getAttribute('data-act');
   if(act==='dictate') return toggleDictation();
-  if(act==='sample'){ S.note=NOTE; S.speechMsg='sample loaded'; return render(); }
+  if(act==='sample'){ S.note=NOTE; S.speechMsg='sample loaded'; saveDraft(); return render(); }
   if(act==='scrub'){
     if(e.currentTarget.classList.contains('disabled')){ focusNote(); return; }
     if(!S.note.trim()){ alert('Dictate or type a note first — or tap “Use a sample note”.'); return; }
@@ -381,6 +471,7 @@ function updateCaptureControls(){
 
 function handleNoteInput(value){
   S.note = value;
+  saveDraft();
   updateCaptureControls();
 }
 
@@ -396,6 +487,7 @@ function focusNote(){
 function setCaptureNote(text, msg){
   S.note = text.trim();
   if(msg) S.speechMsg = msg;
+  saveDraft();
   const n = noteInput();
   if(n && S.screen==='capturing'){
     n.value = S.note;
@@ -439,19 +531,27 @@ function toggleDictation(){
 
 async function doScrub(){
   S.result=null; S.error=null;
+  setJob('scrub','running','rules union Bonsai');
   if(S.screen==='scrubbing') render();          // show the loading state immediately
   try{
     const res = await fetch('/api/scrub',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:S.note})});
     const data = await res.json().catch(()=>({error:'the scrubber returned '+res.status}));
     if(!res.ok || data.error) throw new Error(data.error || ('the scrubber returned '+res.status));
     S.result = data;
-  }catch(err){ S.error = (err && err.message) || 'could not reach the scrubber'; }
+    setJob('scrub','complete',`${(data.redactions||[]).length} identifiers caught`);
+  }catch(err){
+    S.error = (err && err.message) || 'could not reach the scrubber';
+    setJob('scrub','failed',S.error);
+  }
+  saveDraft();
+  clearJobSoon();
   if(S.screen==='scrubbing') render();
 }
 
 async function doSend(){
   S.posted=false; S.sendNote=''; S.trajectoryNote='';
-  const sendId = (crypto&&crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+  setJob('send','running','posting clean record');
+  const sendId = (window.crypto&&crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
   const body = JSON.stringify({record:S.result.record, send_id:sendId});
   // real Slack post, with a minimum dwell so the flush animation reads
   const postOnce = () => fetch('/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body})
@@ -463,6 +563,7 @@ async function doSend(){
   const post = postOnce().catch(async ()=>{
       const edge = await fetch('/api/health',{cache:'no-store'}).then(r=>r.ok).catch(()=>false);
       if(edge){
+        setJob('send','retrying','edge reachable; replaying send id');
         await new Promise(r=>setTimeout(r,350));
         return postOnce().catch(()=>({
           ok:false,
@@ -477,25 +578,32 @@ async function doSend(){
   const [data] = await Promise.all([post, new Promise(r=>setTimeout(r,1900))]);
   S.posted = !!data.ok; S.sendNote = data.ok ? '' : (data.error||'');
   if(data.ok){
+    setJob('trajectory','running',data.deduped?'Slack ack replayed':'Slack accepted');
     const traj = await fetch('/api/trajectory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({record:S.result.record})})
       .then(r=>r.json()).catch(()=>({ok:false,error:'trajectory store unavailable'}));
-    if(traj.ok){ S.trajectoryCount = traj.count; S.trajectoryNote = 'trajectory stored · gate-clean'; }
-    else { S.trajectoryNote = traj.error || 'trajectory not stored'; }
+    if(traj.ok){ S.trajectoryCount = traj.count; S.trajectoryNote = 'trajectory stored · gate-clean'; setJob('trajectory','complete',`stored #${traj.count}`); }
+    else { S.trajectoryNote = traj.error || 'trajectory not stored'; setJob('trajectory','failed',S.trajectoryNote); }
   } else {
     S.trajectoryNote = 'trajectory not stored · Slack send failed';
+    setJob('send','failed',S.sendNote);
   }
+  saveDraft();
+  clearJobSoon();
   go('delivered');
 }
 
 async function doPackReveal(){
   S.packDemo=null; S.packError=null;
+  setJob('pack','running','loading declarative pack');
   if(S.screen==='pack') render();
   try{
     const res = await fetch('/api/pack-demo');
     const data = await res.json().catch(()=>({error:'pack endpoint returned '+res.status}));
     if(!res.ok || data.error) throw new Error(data.error || ('pack endpoint returned '+res.status));
     S.packDemo=data;
-  }catch(err){ S.packError=(err && err.message)||'could not run the pack reveal'; }
+    setJob('pack','complete','five files verified');
+  }catch(err){ S.packError=(err && err.message)||'could not run the pack reveal'; setJob('pack','failed',S.packError); }
+  clearJobSoon();
   if(S.screen==='pack') render();
 }
 
@@ -541,14 +649,20 @@ function showSlack(){
 }
 $slack.addEventListener('click',e=>{ if(e.target===$slack) $slack.style.display='none'; });
 
+loadDraft();
+S.screen = routeStep();
+writeRoute(S.screen, true);
 render();
 refreshStatus();
+setInterval(refreshStatus, 5000);
+setInterval(()=>{ if(S.job && (S.job.status==='running'||S.job.status==='retrying')) render(); }, 1000);
+window.addEventListener('popstate',()=>{ S.screen=routeStep(); render(); });
 
 async function refreshStatus(){
   try{
     const res = await fetch('/api/status');
     const data = await res.json();
-    if(data.ok){ S.status=data; if(S.screen==='capturing') render(); }
+    if(data.ok){ S.status=data; if(S.screen==='capturing' || S.job) render(); }
   }catch(_){}
 }
 </script>
