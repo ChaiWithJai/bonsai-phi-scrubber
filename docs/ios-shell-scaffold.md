@@ -20,10 +20,12 @@ not prove the privacy claim.
 
 ## Current Simulator Backend Modes
 
-`shells/ios` now carries two deterministic mocks with backend-compatible DTOs:
+`shells/ios` now carries two deterministic mocks with backend-compatible DTOs and one visible
+hardware-gated target:
 
 - `mlx-swift mock` — the intended future shape of the in-process MLX text adapter.
 - `edge HTTP mock` — the intended future shape of the laptop/web `/api/scrub` adapter.
+- `on-device mlx-swift` — locked in Simulator; the real M3-T00 measurement target.
 
 Both produce the same transport-shaped response fields: `scrubbed_text`, `redactions`,
 `gate_pass`, `residual_count`, and `record`. This keeps the Swift UI interoperable with

@@ -14,11 +14,20 @@ public enum DemoPhase: String, CaseIterable, Sendable {
 public enum BackendRuntime: String, CaseIterable, Codable, Equatable, Sendable {
     case mlxSwiftMock = "mlx-swift mock"
     case edgeHTTPMock = "edge HTTP mock"
+    case onDeviceMLXSwift = "on-device mlx-swift"
 
     public var label: String {
         switch self {
         case .mlxSwiftMock: "MLX Swift mock"
         case .edgeHTTPMock: "Edge HTTP mock"
+        case .onDeviceMLXSwift: "On-device MLX Swift"
+        }
+    }
+
+    public var isRunnableInSimulator: Bool {
+        switch self {
+        case .mlxSwiftMock, .edgeHTTPMock: true
+        case .onDeviceMLXSwift: false
         }
     }
 
@@ -28,6 +37,8 @@ public enum BackendRuntime: String, CaseIterable, Codable, Equatable, Sendable {
             "Simulator stand-in for in-process Bonsai MLX text on iPhone 11 class hardware."
         case .edgeHTTPMock:
             "Simulator stand-in for the laptop `/api/scrub` JSON contract."
+        case .onDeviceMLXSwift:
+            "Hardware-gated target: real MLX text weights, client-side constraints, and iPhone 11/A13 measurement."
         }
     }
 }
@@ -36,15 +47,22 @@ public struct BackendSelection: Codable, Equatable, Sendable {
     public var runtime: BackendRuntime
     public var deviceClass: String
     public var model: String
+    public var constraints: [String]
 
     public init(
         runtime: BackendRuntime = .mlxSwiftMock,
         deviceClass: String = "iPhone 11 / A13 simulator budget",
-        model: String = "ternary-bonsai-1.7b@mock-mlx"
+        model: String = "ternary-bonsai-1.7b@mock-mlx",
+        constraints: [String] = [
+            "schema-compatible response",
+            "client-side constrained decoding required for real MLX",
+            "M3-T00 device measurement required"
+        ]
     ) {
         self.runtime = runtime
         self.deviceClass = deviceClass
         self.model = model
+        self.constraints = constraints
     }
 }
 
@@ -194,6 +212,10 @@ public struct SimulatorEdgeHTTPProvider: AirplaneInferenceProvider {
     }
 }
 
+public enum BackendSelectionError: Error, Equatable, Sendable {
+    case hardwareRuntimeUnavailable(BackendRuntime)
+}
+
 public struct AirplaneDemoFlow: Equatable, Sendable {
     public static let sampleNote = """
     Jordan Lee, member COACH-4821, met with coach Maya on March 12. Jordan wants to practice \
@@ -222,6 +244,10 @@ public struct AirplaneDemoFlow: Equatable, Sendable {
         secureStore.snapshot
     }
 
+    public var selectedBackendCanRunInSimulator: Bool {
+        backend.runtime.isRunnableInSimulator
+    }
+
     public mutating func reset() {
         let selected = backend
         self = AirplaneDemoFlow(backend: selected)
@@ -229,9 +255,17 @@ public struct AirplaneDemoFlow: Equatable, Sendable {
 
     public mutating func selectBackend(_ runtime: BackendRuntime) {
         backend.runtime = runtime
-        backend.model = runtime == .mlxSwiftMock
-            ? "ternary-bonsai-1.7b@mock-mlx"
-            : "ternary-bonsai-1.7b@mock-edge-http"
+        switch runtime {
+        case .mlxSwiftMock:
+            backend.model = "ternary-bonsai-1.7b@mock-mlx"
+            backend.deviceClass = "iPhone 11 / A13 simulator budget"
+        case .edgeHTTPMock:
+            backend.model = "ternary-bonsai-1.7b@mock-edge-http"
+            backend.deviceClass = "Mac edge node HTTP contract"
+        case .onDeviceMLXSwift:
+            backend.model = "ternary-bonsai-1.7b@mlx-text-unwired"
+            backend.deviceClass = "physical iPhone 11 / A13 measurement gate"
+        }
     }
 
     public mutating func capture(_ note: String = AirplaneDemoFlow.sampleNote) {
@@ -251,6 +285,12 @@ public struct AirplaneDemoFlow: Equatable, Sendable {
         guard phase == .capturing else { return }
 
         phase = .scrubbing
+        guard backend.runtime.isRunnableInSimulator else {
+            gateResult = DemoGateResult(passed: false, residualCount: 1)
+            phase = .gated
+            return
+        }
+
         let activeProvider = provider ?? defaultProvider(for: backend.runtime)
         let request = BackendScrubRequest(text: capturedText, backend: backend)
         lastRequest = request
@@ -292,7 +332,7 @@ private func defaultProvider(for runtime: BackendRuntime) -> AirplaneInferencePr
     switch runtime {
     case .mlxSwiftMock:
         SimulatorMLXSwiftTextProvider()
-    case .edgeHTTPMock:
+    case .edgeHTTPMock, .onDeviceMLXSwift:
         SimulatorEdgeHTTPProvider()
     }
 }

@@ -73,13 +73,17 @@ public struct AirplaneDemoView: View {
                 set: { model.selectBackend($0) }
             )) {
                 ForEach(BackendRuntime.allCases, id: \.self) { runtime in
-                    Text(runtime.label).tag(runtime)
+                    Text(runtime.isRunnableInSimulator ? runtime.label : "\(runtime.label) locked")
+                        .tag(runtime)
                 }
             }
             .pickerStyle(.segmented)
 
             Text(model.flow.backend.runtime.detail)
                 .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("Profile: \(model.flow.backend.deviceClass)")
+                .font(.caption.monospaced())
                 .foregroundStyle(.secondary)
         }
         .disabled(model.flow.phase != .idle)
@@ -151,6 +155,7 @@ public struct AirplaneDemoView: View {
                 Label(primaryActionTitle, systemImage: primaryActionIcon)
             }
             .buttonStyle(.borderedProminent)
+            .disabled(model.flow.phase == .idle && !model.flow.selectedBackendCanRunInSimulator)
 
             Button(action: model.reset) {
                 Label("Reset", systemImage: "arrow.counterclockwise")
@@ -161,7 +166,7 @@ public struct AirplaneDemoView: View {
 
     private var primaryActionTitle: String {
         switch model.flow.phase {
-        case .idle: "Capture"
+        case .idle: model.flow.selectedBackendCanRunInSimulator ? "Capture" : "Hardware gated"
         case .capturing: "Scrub"
         case .scrubbing: "Wait"
         case .gated: "Structure"

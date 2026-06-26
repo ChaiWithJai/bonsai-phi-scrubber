@@ -76,6 +76,25 @@ import Foundation
     #expect(flow.record?.clientPseudonym == "client ready circle")
 }
 
+@Test func realMLXRuntimeIsVisibleButHardwareGatedInSimulator() {
+    var flow = AirplaneDemoFlow()
+
+    flow.selectBackend(.onDeviceMLXSwift)
+    #expect(flow.backend.runtime == .onDeviceMLXSwift)
+    #expect(flow.backend.model == "ternary-bonsai-1.7b@mlx-text-unwired")
+    #expect(!flow.selectedBackendCanRunInSimulator)
+
+    flow.capture()
+    flow.scrubAndGate()
+
+    #expect(flow.phase == .gated)
+    #expect(flow.gateResult == DemoGateResult(passed: false, residualCount: 1))
+    #expect(flow.lastRequest == nil)
+    #expect(flow.lastResponse == nil)
+    #expect(flow.record == nil)
+    #expect(flow.deliveredPayload == nil)
+}
+
 @Test func scrubResponseUsesWebBackendCompatibleKeys() throws {
     var flow = AirplaneDemoFlow()
 

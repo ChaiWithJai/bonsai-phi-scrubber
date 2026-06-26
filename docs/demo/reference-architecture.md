@@ -78,10 +78,12 @@ The iOS package currently includes simulator mocks for two backend modes:
 
 - `MLX Swift mock`
 - `Edge HTTP mock`
+- `On-device MLX Swift` visible as a locked hardware-gated target
 
 Both return the shared scrub response contract in `docs/contracts/`. That keeps
 the UI and tests interoperable while leaving the real `mlx-swift` text path open
-for a measured implementation.
+for a measured implementation. The locked target is intentional: it names the
+gap without letting Simulator imply a privacy or performance proof.
 
 ## 5. Evidence Checklist
 
