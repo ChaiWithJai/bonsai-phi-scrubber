@@ -40,7 +40,8 @@ dependency.
 4. [`docs/demo/fsm-service-map.md`](docs/demo/fsm-service-map.md) — service map, screens, addressable state.
 5. [`docs/demo/how-the-demo-works.md`](docs/demo/how-the-demo-works.md) — architecture, topology, examples.
 6. [`docs/extending.md`](docs/extending.md) — change the pack for a hackathon.
-7. [`docs/deprecations/`](docs/deprecations/) — old patterns and revival.
+7. [`docs/repo-quality-benchmark.md`](docs/repo-quality-benchmark.md) — OSS quality bar and remaining slop risks.
+8. [`docs/deprecations/`](docs/deprecations/) — old patterns and revival.
 
 ## Load-Bearing Decisions
 
@@ -50,6 +51,8 @@ dependency.
 | Web demo simulates airplane mode; literal radio-off proof deferred | [`files/adr-015-airplane-mode-simulated-in-web-demo.md`](files/adr-015-airplane-mode-simulated-in-web-demo.md) |
 | Build spec and trust boundary | [`files/rfc-002-final-ship.md`](files/rfc-002-final-ship.md) |
 | Deprecated pattern index | [`docs/deprecations/decision-records/DR-2026-06-26-deprecated-pattern-index.md`](docs/deprecations/decision-records/DR-2026-06-26-deprecated-pattern-index.md) |
+| Public context graph policy | [`docs/deprecations/decision-records/DR-2026-06-26-public-context-graph.md`](docs/deprecations/decision-records/DR-2026-06-26-public-context-graph.md) |
+| OSS quality benchmark | [`docs/repo-quality-benchmark.md`](docs/repo-quality-benchmark.md) |
 
 ## What Stays In The Main Path
 

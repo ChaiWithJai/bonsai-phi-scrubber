@@ -449,6 +449,7 @@ recover with Git when a builder has a real use case.
 | `docs/demo/reference-architecture.md` | CNCF-style adopter/builder reference architecture. |
 | `docs/extending.md` | Pack extension walkthrough. |
 | `docs/demo/how-the-demo-works.md` | Architecture, topology, workload profile, worked examples. |
+| `docs/repo-quality-benchmark.md` | OSS quality benchmark against Nomad, Ghostty, Zap, and Cadence. |
 | `docs/positioning/cncf-end-user-and-inference-ecosystem.md` | Audience split: adopter outcome language vs. builder mechanism language. |
 | `docs/positioning/prismml-partner-brief.md` | Respectful partner-facing brief for how Airplane Mode can help Bonsai adoption. |
 | `AGENTS.md` | Harnessed build loop and hard rules. |
