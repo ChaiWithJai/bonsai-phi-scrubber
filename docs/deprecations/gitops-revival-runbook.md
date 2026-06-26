@@ -63,21 +63,21 @@ running in the original checkout.
 Restore one historical file into your branch:
 
 ```bash
-git restore --source <commit> -- files/demo-spec-airplane-mode.md
+git restore --source <commit> -- docs/deprecations/canon/demo-spec-airplane-mode.md
 ```
 
 Rename it into the deprecations area if it is only reference material:
 
 ```bash
 mkdir -p docs/deprecations/revived
-git mv files/demo-spec-airplane-mode.md docs/deprecations/revived/demo-spec-airplane-mode.md
+git mv docs/deprecations/canon/demo-spec-airplane-mode.md docs/deprecations/revived/demo-spec-airplane-mode.md
 ```
 
 Then add a note at the top:
 
 ```text
 Status: revived reference. Not the current demo claim.
-Revived from: <commit>:files/demo-spec-airplane-mode.md
+Revived from: <commit>:docs/deprecations/canon/demo-spec-airplane-mode.md
 ```
 
 ## Bring Back A Commit Without Committing It

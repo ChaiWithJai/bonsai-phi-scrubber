@@ -111,7 +111,7 @@ See `files/adr-014-portable-rust-core.md` for the terse record. In short:
 
 ## 6. How this gets built: loop engineering
 
-This repo is organized so the build runs as a **harnessed loop** (per `files/harnessed-loop.md`), not as one big session. A champion drops the repo into Codex or Claude Code and runs the loop; the filesystem + git are the memory and system of record.
+This repo is organized so the build runs as a **harnessed loop** (per `docs/deprecations/canon/harnessed-loop.md`), not as one big session. A champion drops the repo into Codex or Claude Code and runs the loop; the filesystem + git are the memory and system of record.
 
 - **The harness / operating manual:** `AGENTS.md` (and `CLAUDE.md` → it). The non-negotiable gates, the trust-boundary hard rules, and how to run one iteration.
 - **The work queue:** `backlog/` — milestones M0–M5 as task files, each with a goal, a reproduction criterion, the gate that admits it, and a "done-when." The loop pulls the next unblocked task, does it, runs the gates, and checks it off.

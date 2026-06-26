@@ -28,4 +28,4 @@ Deeper notes: `docs/seed/bonsai-ecosystem-brief.md`.
 
 ## On-device (the vision)
 
-For the native iPhone path, Bonsai ships **MLX** weights on `prism-ml/` for mlx-swift — that's the tamper-evident, radios-off shell tracked in [issue #9](../../issues/9). The GGUF + `llama-server` path here is the laptop edge node and the reproduction front door.
+For the native iPhone path, Bonsai ships **MLX** weights on `prism-ml/` for mlx-swift — that's the tamper-evident, radios-off shell tracked in [issue #9](https://github.com/ChaiWithJai/airplane-mode/issues/9). The GGUF + `llama-server` path here is the laptop edge node and the reproduction front door.

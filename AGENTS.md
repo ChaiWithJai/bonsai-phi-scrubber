@@ -2,17 +2,17 @@
 
 This repo is built by a **harnessed loop**, not one big session. You (a coding agent in Codex or Claude Code) pull the next unblocked task from `backlog/`, do exactly that task, run the gates, commit, and stop. The filesystem and git are the memory and the system of record. A human (Jai) reviews at milestone boundaries.
 
-> **New here? Read in this order:** `README.md` → `CANON.md` (the design canon index) → `docs/superpowers/specs/2026-06-25-portable-core-architecture-design.md` (the architecture) → `files/rfc-002-final-ship.md` (the build spec) → this file → `backlog/README.md`.
+> **New here? Read in this order:** `README.md` → `CANON.md` (current demo contract) → `docs/demo/onboarding.md` → `docs/demo/how-the-demo-works.md` → this file → `backlog/README.md`. Historical canon and superseded patterns live under `docs/deprecations/`.
 
 ---
 
 ## What we're building (one paragraph)
 
-An on-device PHI scrubber for a mental-health **coaching** scribe. A 1-bit **Bonsai** model on a phone de-identifies a (synthetic) session **on-device**; a **verifier gate** blocks egress until the output is provably clean; only a de-identified, structured record reaches Slack. The de-id+gate logic is a portable **Rust core** (`airplane-core`) with **ports**; three shells (iOS, CLI, MCP) inject platform implementations. The demo role-models value migration: pull a sensitive workload off the datacenter, run it at the edge, make it yours via a declarative **pack**, reach it from any runtime.
+An edge PHI scrubber for a mental-health **coaching** scribe demo. A phone browser captures a synthetic session note; the current reliable demo runs the scrubber on the first-party laptop edge, with Browser GPU as the preferred phone-local runtime spike. A **verifier gate** blocks egress until the output is provably clean; only a scrubbed, structured record reaches Slack. The de-id+gate logic is a portable **Rust core** (`airplane-core`) with **ports**. The demo role-models value migration: pull a sensitive workload off the datacenter, run it at the edge, make it yours via a declarative **pack**, reach it from any runtime.
 
 ## The architecture in one breath
 
-`airplane-core` (Rust) owns rules executor · verifier gate · pipeline · pack loader. It depends only on four port traits: `InferenceProvider` · `SecureStore` · `Capture` · `Sink`. The **model is a port**, never in the core. Shells: **CLI** (reproduction front door), **iOS** (airplane-mode proof, mlx-swift), **MCP** (agent-native proof). See ADR-014 (`files/adr-014-portable-rust-core.md`).
+`airplane-core` (Rust) owns rules executor · verifier gate · pipeline · pack loader. It depends only on four port traits: `InferenceProvider` · `SecureStore` · `Capture` · `Sink`. The **model is a port**, never in the core. Shells: **web** (live phone/laptop demo), **CLI** (reproduction front door), **MCP** (agent-native proof), and **iOS** (deferred/simulator-safe scaffold). See ADR-014 (`files/adr-014-portable-rust-core.md`).
 
 ---
 

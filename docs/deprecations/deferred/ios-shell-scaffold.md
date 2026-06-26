@@ -59,7 +59,7 @@ Until that measurement exists:
 - label the current `shells/ios` package as simulator choreography + interop scaffolding only
 
 There is also a browser-first alternative now worth measuring. See
-[`webgpu-vs-mlx.md`](webgpu-vs-mlx.md) for the comparison between native MLX
+[`docs/deprecations/spikes/webgpu-vs-mlx.md`](../spikes/webgpu-vs-mlx.md) for the comparison between native MLX
 Swift and browser WebGPU. The shared requirement is unchanged: local inference
 may vary, but the verifier gate still decides whether anything can leave.
 

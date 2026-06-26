@@ -151,9 +151,9 @@ backend modes. It does not prove real iPhone 11/A13 inference.
 
 For the next real phone path, start with the browser GPU route. The ecosystem has
 already proven a Bonsai WebGPU demo on Hugging Face, so the next dense move is to
-wrap that runtime path in this repo's verifier gate. See
-[`docs/webgpu-vs-mlx.md`](docs/webgpu-vs-mlx.md) and
-[`docs/browser-gpu-spike-report.md`](docs/browser-gpu-spike-report.md).
+wrap that runtime path in this repo's verifier gate. The detailed WebGPU/MLX
+research lives in [`docs/deprecations/spikes/`](docs/deprecations/spikes/) so it
+does not crowd the core runbook.
 
 For a sovereign browser-GPU demo, warm the browser runtime and q1 Bonsai model
 artifacts before opening the phone UI:
@@ -424,8 +424,6 @@ recover with Git when a builder has a real use case.
 | `packs/coach-session/` | Reference pack and synthetic eval set. |
 | `docs/model-setup.md` | Model download/runtime details. |
 | `docs/deprecations/` | Cleanup proposal, deprecated-pattern decisions, and GitOps revival runbook. |
-| `docs/webgpu-vs-mlx.md` | Phone-path comparison: native MLX Swift vs browser WebGPU. |
-| `docs/browser-gpu-spike-report.md` | Spike report narrowing the phone path to browser GPU first. |
 | `docs/hipaa-cloudflare-boundary.md` | Why Cloudflare HTTPS helps capability probes but is not HIPAA compliance. |
 | `docs/sovereign-network-pattern.md` | First-party phone-to-edge network pattern for adopters. |
 | `docs/contracts/` | Shared JSON contract fixtures for shell/backend interoperability. |

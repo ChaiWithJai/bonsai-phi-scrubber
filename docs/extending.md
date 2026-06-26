@@ -65,4 +65,4 @@ For custom packs, `PACK=... ./run.sh eval` prints that pack's metrics without ov
 
 ## Why this is safe to open up
 
-The core is reviewed and gated once; the pack is declarative and PHI-blind. A pack can redefine *what an identifier is* and *where clean records go* — it can never see raw input, read the redaction map, or change the verifier. So anyone may write a pack, and the trust boundary still holds. (ADR-005; `files/clinic-pack-pattern.md`.)
+The core is reviewed and gated once; the pack is declarative and PHI-blind. A pack can redefine *what an identifier is* and *where clean records go* — it can never see raw input, read the redaction map, or change the verifier. So anyone may write a pack, and the trust boundary still holds. (ADR-005; `docs/deprecations/canon/clinic-pack-pattern.md`.)

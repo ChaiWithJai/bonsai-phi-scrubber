@@ -6,7 +6,7 @@ This runbook is written for the adopter path first: prove the workflow with
 synthetic data, understand the safety boundary, then change the pack for your own
 workflow. That is the intended 70/30 weighting for the demo docs. If you are here
 to extend the inference runtime or the iOS adapter, start with
-[`../ios-shell-scaffold.md`](../ios-shell-scaffold.md) and
+[`docs/deprecations/deferred/ios-shell-scaffold.md`](../deprecations/deferred/ios-shell-scaffold.md) and
 [`../positioning/cncf-end-user-and-inference-ecosystem.md`](../positioning/cncf-end-user-and-inference-ecosystem.md)
 after you have seen the demo run once.
 

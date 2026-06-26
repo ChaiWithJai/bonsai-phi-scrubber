@@ -2,7 +2,7 @@
 **Status:** Accepted (2026-06-25). Follows the Beat-1 web pivot (see `backlog/m3.md`) and builds on ADR-014 (the web shell is a shell over `airplane-core`).
 
 ## Context
-The original demo (`files/demo-spec-airplane-mode.md`, RFC-002) made **literal airplane mode the no-leak proof**: an iPhone with its radios physically off is *tamper-evidently* incapable of transmitting, it scrubs on-device, and only after the radios are switched back on does the clean record post. The demo spec's hard rule was explicit: *"Airplane mode is the proof, not a software meter."*
+The original demo (`docs/deprecations/canon/demo-spec-airplane-mode.md`, RFC-002) made **literal airplane mode the no-leak proof**: an iPhone with its radios physically off is *tamper-evidently* incapable of transmitting, it scrubs on-device, and only after the radios are switched back on does the clean record post. The demo spec's hard rule was explicit: *"Airplane mode is the proof, not a software meter."*
 
 Beat 1 now ships as a **web shell**, not native iOS — TestFlight/native distribution was unavailable, so the phone runs a browser that reaches the scrub server on the **laptop** over Wi-Fi / Personal Hotspot (the "laptop as the edge node" framing in `shells/web/README.md`).
 
@@ -25,4 +25,4 @@ Two related "kills":
 - Beat 1 **runs on any phone today**, no TestFlight, no app install.
 - This is recorded so the reframing isn't mistaken for a weakening of the thesis: the bet — intelligence comes to the data, egress is gated — holds; only the *tamper-evidence* of the radio-off proof is traded for runnable-today. Anyone restoring the native path should re-read the demo spec's "airplane mode is the proof" rule and treat it as the bar to clear.
 
-**Refs:** `files/demo-spec-airplane-mode.md` (the original proof), `files/adr-014-portable-rust-core.md`, `shells/web/README.md`, `docs/demo/onboarding.md` (the "don't use real airplane mode" warning).
+**Refs:** `docs/deprecations/canon/demo-spec-airplane-mode.md` (the original proof), `files/adr-014-portable-rust-core.md`, `shells/web/README.md`, `docs/demo/onboarding.md` (the "don't use real airplane mode" warning).

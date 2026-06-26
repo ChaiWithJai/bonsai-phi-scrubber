@@ -68,19 +68,19 @@ docs/contracts/            API/schema fixtures
 docs/seed/                 Bonsai ecosystem facts
 ```
 
-The older `files/` canon is still useful, but it should be treated as historical
-design context. The current public path should link readers to the smaller demo
-docs first, then let ecosystem builders dig into the canon when needed.
+The older canon is still useful, but it is now treated as historical design
+context under `docs/deprecations/canon/`. The current public path links readers
+to the smaller demo docs first, then lets ecosystem builders dig into the canon
+when needed.
 
 ## Cleanup Sequence
 
-1. Add this deprecations folder and decision records.
-2. Add pointers from `README.md` and `CANON.md`.
-3. Stamp superseded docs with one-line status notes instead of editing their
-   substance.
-4. Only after review, consider moving stale docs into a `docs/deprecations/old-canon/`
-   folder in a separate commit.
-5. For any move, record the pre-move commit SHA and old path in a decision
+1. Add this deprecations folder and decision records. Done.
+2. Add pointers from `README.md` and `CANON.md`. Done.
+3. Move superseded canon, spike, and deferred docs under `docs/deprecations/`.
+   Done.
+4. Keep the root `CANON.md` short and current. Done.
+5. For future moves, record the pre-move commit SHA and old path in a decision
    record so `git show <sha>:<old-path>` still works.
 
 ## Done-When For Cleanup
