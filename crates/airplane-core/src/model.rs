@@ -13,8 +13,16 @@ pub struct Span {
 }
 
 impl Span {
-    pub fn new(text: impl Into<String>, entity: impl Into<String>, layer: impl Into<String>) -> Self {
-        Self { text: text.into(), entity: entity.into(), layer: layer.into() }
+    pub fn new(
+        text: impl Into<String>,
+        entity: impl Into<String>,
+        layer: impl Into<String>,
+    ) -> Self {
+        Self {
+            text: text.into(),
+            entity: entity.into(),
+            layer: layer.into(),
+        }
     }
     /// Dedup key — identifiers are matched case-insensitively.
     pub fn key(&self) -> String {
@@ -29,9 +37,8 @@ pub struct Sampling {
     pub top_k: u32,
     pub top_p: f32,
     pub max_tokens: u32,
-    /// Fixed RNG seed. With a seed, even temperature>0 is reproducible (llama.cpp is
-    /// deterministic given seed+params) — so eval keeps the sampling path the model
-    /// extracts best under *and* a byte-stable `golden-run.txt`.
+    /// Fixed RNG seed. Eval keeps the sampling path the model extracts best under and
+    /// reports deterministic score/gate outputs rather than raw model span churn.
     pub seed: u64,
 }
 
@@ -39,16 +46,31 @@ impl Sampling {
     /// Pure greedy (argmax). Deterministic, but for this ternary model it extracts
     /// *fewer* identifiers than seeded sampling (see eval), so it's not the eval path.
     pub fn greedy() -> Self {
-        Self { temperature: 0.0, top_k: 1, top_p: 1.0, max_tokens: 512, seed: 0 }
+        Self {
+            temperature: 0.0,
+            top_k: 1,
+            top_p: 1.0,
+            max_tokens: 512,
+            seed: 0,
+        }
     }
     /// PrismML Bonsai model-card sampling — interactive use.
     pub fn model_card() -> Self {
-        Self { temperature: 0.5, top_k: 20, top_p: 0.85, max_tokens: 512, seed: 0 }
+        Self {
+            temperature: 0.5,
+            top_k: 20,
+            top_p: 0.85,
+            max_tokens: 512,
+            seed: 0,
+        }
     }
     /// Eval decoding: model-card sampling with a **fixed seed** — recall-best *and*
     /// reproducible. This is what `airplane eval` uses.
     pub fn eval() -> Self {
-        Self { seed: 42, ..Self::model_card() }
+        Self {
+            seed: 42,
+            ..Self::model_card()
+        }
     }
 }
 

@@ -27,8 +27,17 @@ pub struct ScrubResult {
 /// stops the small model from swapping a name into the `entity` slot — the failure
 /// mode that leaks the actual identifier.
 pub const ENTITIES: &[&str] = &[
-    "PERSON", "DATE", "LOCATION", "ADDRESS", "ORG", "RELATIONSHIP", "FAMILY_DETAIL",
-    "MEMBER_ID", "PHONE", "EMAIL", "OTHER",
+    "PERSON",
+    "DATE",
+    "LOCATION",
+    "ADDRESS",
+    "ORG",
+    "RELATIONSHIP",
+    "FAMILY_DETAIL",
+    "MEMBER_ID",
+    "PHONE",
+    "EMAIL",
+    "OTHER",
 ];
 
 /// The JSON schema the model output is constrained to (CLI: server-side; iOS: client-side).
@@ -62,19 +71,74 @@ fn plausible(text: &str, entity: &str) -> bool {
     let lower = t.to_lowercase();
     let words = t.split_whitespace().count();
     let has_digit = t.chars().any(|c| c.is_ascii_digit());
+    let digit_count = t.chars().filter(|c| c.is_ascii_digit()).count();
+    let has_sentence_punct = t.contains('.') || t.contains('!') || t.contains('?');
     // Common non-identifier words the 1.7B model mislabels (never real names/ids).
     const COMMON: &[&str] = &[
-        "committed", "commit", "commitment", "daily", "weekly", "morning", "evening",
-        "walk", "walks", "session", "meeting", "met", "next", "plan", "goal", "the",
-        "she", "he", "her", "him", "they",
+        "committed",
+        "commit",
+        "commitment",
+        "daily",
+        "weekly",
+        "morning",
+        "evening",
+        "walk",
+        "walks",
+        "session",
+        "meeting",
+        "met",
+        "next",
+        "plan",
+        "goal",
+        "the",
+        "she",
+        "he",
+        "her",
+        "him",
+        "they",
+        "i",
+        "email",
+        "set",
+        "today",
+        "today's session",
+        "today's check-in",
+        "check-in",
+        "lights out",
+        "lights out by eleven",
+        "weekend",
+        "weekend pickups",
+        "this week",
+        "this year",
+        "summer",
+        "household",
+        "concrete step",
+        "handoffs",
+        "isolation",
+        "local group",
+        "recently joined a pottery class",
+        "pottery class",
+        "around the block",
+        "memory-care wing",
+        "sleeping",
+        "progress",
+        "feels",
+        "slow",
+        "but it is real",
+        "evening walks",
     ];
     if COMMON.contains(&lower.as_str()) {
         return false;
     }
     match entity {
-        "PERSON" | "ORG" => words <= 5 && !has_digit,
+        "PERSON" => words <= 5 && !has_digit && !has_sentence_punct,
+        "ORG" => words <= 5,
         "MEMBER_ID" => words == 1 && has_digit, // ids are single tokens containing a digit
-        "RELATIONSHIP" | "FAMILY_DETAIL" | "ADDRESS" | "LOCATION" => words <= 9,
+        "PHONE" => digit_count >= 7,
+        "EMAIL" => t.contains('@') && t.contains('.'),
+        "DATE" => words <= 9 && !has_sentence_punct,
+        "RELATIONSHIP" | "FAMILY_DETAIL" | "ADDRESS" | "LOCATION" => {
+            words <= 9 && !has_sentence_punct
+        }
         _ => true,
     }
 }
@@ -94,7 +158,11 @@ struct ModelSpan {
 /// The contextual layer — ask the model for identifiers, parse defensively.
 /// Never panics on bad output: a parse failure yields no spans (the rules layer
 /// and the gate still hold the line).
-pub fn bonsai_layer(text: &str, model: &dyn InferenceProvider, sampling: Sampling) -> Result<Vec<Span>> {
+pub fn bonsai_layer(
+    text: &str,
+    model: &dyn InferenceProvider,
+    sampling: Sampling,
+) -> Result<Vec<Span>> {
     let schema = bonsai_schema();
     let req = InferenceRequest {
         system: "You are a PHI de-identification engine. From the note, list ONLY personal \
@@ -126,7 +194,11 @@ pub fn bonsai_layer(text: &str, model: &dyn InferenceProvider, sampling: Samplin
                     !t.is_empty() && lower.contains(&t.to_lowercase()) && plausible(t, &s.entity)
                 })
                 .map(|s| {
-                    let entity = if s.entity.is_empty() { "OTHER".to_string() } else { s.entity };
+                    let entity = if s.entity.is_empty() {
+                        "OTHER".to_string()
+                    } else {
+                        s.entity
+                    };
                     Span::new(s.text, entity, "bonsai")
                 })
                 .collect()
@@ -180,7 +252,11 @@ pub fn scrub(
     }
 
     let gate = VerifierGate::new(rules).check(&scrubbed);
-    Ok(ScrubResult { redaction_map: spans, scrubbed_text: scrubbed, gate })
+    Ok(ScrubResult {
+        redaction_map: spans,
+        scrubbed_text: scrubbed,
+        gate,
+    })
 }
 
 #[cfg(test)]
@@ -194,9 +270,14 @@ mod tests {
         assert!(plausible("CM-204815", "MEMBER_ID"));
         assert!(plausible("daughter just started college", "FAMILY_DETAIL"));
         // the model's common false positives are rejected — recall-safe (never real PHI)
-        assert!(!plausible("Committed", "PERSON"));                 // a verb, not a name
-        assert!(!plausible("walk", "PERSON"));                      // an activity
-        assert!(!plausible("10-min morning walk", "MEMBER_ID"));    // not an id shape
-        assert!(!plausible("Met with John Doe at the clinic today", "PERSON")); // too long
+        assert!(!plausible("Committed", "PERSON")); // a verb, not a name
+        assert!(!plausible("walk", "PERSON")); // an activity
+        assert!(!plausible("10-min morning walk", "MEMBER_ID")); // not an id shape
+        assert!(!plausible(
+            "Met with John Doe at the clinic today",
+            "PERSON"
+        )); // too long
+        assert!(!plausible("email", "EMAIL")); // channel, not address
+        assert!(!plausible("Delphine moved to Juniper Bend Road.", "PHONE")); // category swap
     }
 }

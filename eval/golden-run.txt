@@ -2,30 +2,32 @@ Airplane Mode — eval/golden-run
 pack            : coach-session
 model layer     : rules ∪ Bonsai-1.7B
 decoding        : 5 seeded passes unioned (temp 0.5, seeds 42..)  [deterministic]
-notes           : 20
-recall          : 100.0%  (70/70)
-hard-case recall: 100.0%  (54/54)
+notes           : 21
+recall          : 100.0%  (71/71)
+precision       : 51.1%  (71/139 predicted)
+hard-case recall: 100.0%  (55/55)
 leakage (missed): 0
-over-redactions : 81
+over-redactions : 68
 recall gate     : >= 99%
 
-note-01  gate=PASS  redactions=11
-note-02  gate=PASS  redactions=14
-note-03  gate=PASS  redactions=7
-note-04  gate=PASS  redactions=10
-note-05  gate=PASS  redactions=6
-note-06  gate=PASS  redactions=9
-note-07  gate=PASS  redactions=17
-note-08  gate=PASS  redactions=13
-note-09  gate=PASS  redactions=7
-note-10  gate=PASS  redactions=5
-note-11  gate=PASS  redactions=8
-note-12  gate=PASS  redactions=8
-note-13  gate=PASS  redactions=4
-note-14  gate=PASS  redactions=7
-note-15  gate=PASS  redactions=16
-note-16  gate=PASS  redactions=12
-note-17  gate=PASS  redactions=8
-note-18  gate=PASS  redactions=15
-note-19  gate=PASS  redactions=3
-note-20  gate=PASS  redactions=7
+note-01  gate=PASS
+note-02  gate=PASS
+note-03  gate=PASS
+note-04  gate=PASS
+note-05  gate=PASS
+note-06  gate=PASS
+note-07  gate=PASS
+note-08  gate=PASS
+note-09  gate=PASS
+note-10  gate=PASS
+note-11  gate=PASS
+note-12  gate=PASS
+note-13  gate=PASS
+note-14  gate=PASS
+note-15  gate=PASS
+note-16  gate=PASS
+note-17  gate=PASS
+note-18  gate=PASS
+note-19  gate=PASS
+note-20  gate=PASS
+note-21  gate=PASS

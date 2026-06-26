@@ -6,7 +6,7 @@ The demo and the eval call a local `llama-server` (OpenAI-compatible API on `127
 
 ```bash
 brew install llama.cpp          # the runtime (macOS; Linux: build llama.cpp)
-./scripts/serve-model.sh        # downloads the model (Apache-2.0) + serves on :8080
+./scripts/serve-model.sh        # downloads the pinned model + verifies sha256 + serves on :8080
 ```
 
 That's it — leave it running, then in another terminal: `./run.sh eval` or `./run.sh web`.
@@ -15,7 +15,8 @@ That's it — leave it running, then in another terminal: `./run.sh eval` or `./
 
 - **What:** `prism-ml/Ternary-Bonsai-1.7B-gguf` on Hugging Face — **free, Apache-2.0**. (Note: `prism-ml/Bonsai-*` is the Caltech-spinout family; it is **not** the unrelated `deepgrove/Bonsai`.)
 - **Default:** `Ternary-Bonsai-1.7B-F16.gguf` (~3.2GB) — runs on Apple Metal (`-ngl 99`), ~125 tok/s. `serve-model.sh` downloads this by default.
-- `scripts/serve-model.sh` is configurable via env: `MODEL_PATH` (point at an existing GGUF), `HF_REPO`, `MODEL_FILE`, `NGL` (`0` = CPU only).
+- **Pinned artifact:** Hugging Face repo commit `983b5dec2ff16aab79990711ba0f828a499a7e6a`, file SHA-256 `00be231b1ba8ab8b45db35d288f897fa9b5836bb6ad41762b759b6bc990b4fea`.
+- `scripts/serve-model.sh` is configurable via env: `MODEL_PATH` (point at an existing GGUF), `MODEL_SHA256`, `HF_REPO`, `MODEL_REV`, `MODEL_FILE`, `NGL` (`0` = CPU only). Custom model paths must provide the matching `MODEL_SHA256`; a mismatch aborts before serving.
 
 ## Footguns (verified)
 

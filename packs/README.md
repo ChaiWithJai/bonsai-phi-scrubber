@@ -12,6 +12,11 @@ coach-session/                 # the reference pack every adopter copies
 └── eval/golden|expected/      # ~20 synthetic golden notes + expected redactions
 ```
 
+`provenance.yaml` records the local demo release identity plus SHA-256 digests for
+the declared pack files. The gate recomputes those digests and rejects tampering.
+This is not a full Sigstore/Rekor inclusion proof; it is the local integrity layer
+that keeps the demo honest until public release signing exists.
+
 **A pack can:** redefine what an identifier is, the record schema, the policy, and the sink.
 **A pack can never:** see raw PHI, read the redaction map, alter the verifier, or ship code.
 

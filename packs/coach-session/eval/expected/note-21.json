@@ -1,0 +1,11 @@
+{
+  "id": "note-21",
+  "clean": false,
+  "redactions": [
+    {
+      "text": "BEN-MH-7741",
+      "entity": "BENEFIT_ID",
+      "hard": true
+    }
+  ]
+}

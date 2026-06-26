@@ -1,0 +1,16 @@
+apiVersion: airplane/v1
+kind: Manifest
+sequence: 1
+previousSequence: 0
+current:
+  core: 0.1.0
+  model: ternary-bonsai-1.7b@sha256:00be231b1ba8ab8b45db35d288f897fa9b5836bb6ad41762b759b6bc990b4fea
+  pack: coach-session@1.0.0
+revoked:
+  - pack: coach-session@0.9.0
+    reason: "recall regression below 0.99"
+signature:
+  keyless: true
+  issuer: https://token.actions.githubusercontent.com
+  identity: ChaiWithJai/airplane-mode/.github/workflows/release.yml@refs/heads/main
+  rekorLog: 00000000-0000-4000-8000-000000000002

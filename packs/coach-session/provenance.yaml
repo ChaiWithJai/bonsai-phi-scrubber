@@ -1,0 +1,32 @@
+apiVersion: airplane/v1
+kind: Provenance
+subject:
+  kind: Pack
+  name: coach-session
+  version: 1.0.0
+builder:
+  id: github-actions
+  workflow: release.yml
+source:
+  repository: https://github.com/ChaiWithJai/airplane-mode
+  ref: refs/heads/main
+files:
+  - path: pack.yaml
+    sha256: fc2f1b745ea0c29c69fe8ad5108871fd61ea565dd1dc2cba7172de55754de819
+  - path: recognizers/members.json
+    sha256: 3bd5ae6688cd780f980ce52e61eee9f2aab51d0456c6e6f25558652bf2ff0175
+  - path: recognizers/people.json
+    sha256: 530bf8b7e859a8a98bba8b193eb11ca64af1df34d30490d2266ce19270c1359f
+  - path: recognizers/benefits.json
+    sha256: fb72bb782fb426fe993b86280a81c2f88a06b56ec9bfd54e944a1c10980a2abc
+  - path: schema.yaml
+    sha256: 62053fa9c23bdcc2d9069797f9bd98925df0cfcb4bf18b2591fed9b4a1377cb4
+  - path: policy.yaml
+    sha256: af3ca305548a0a0ec6834a1515b99c48e42076fb2f1944fcfa15bc55628c44e6
+  - path: sink.yaml
+    sha256: 3b986c2d7f6e1c746ddef7bd0959cfeeefc0b0907d2f731e4cadc52d1b56d809
+signature:
+  keyless: true
+  issuer: https://token.actions.githubusercontent.com
+  identity: ChaiWithJai/airplane-mode/.github/workflows/release.yml@refs/heads/main
+  rekorLog: 00000000-0000-4000-8000-000000000001

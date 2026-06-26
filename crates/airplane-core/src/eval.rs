@@ -14,6 +14,7 @@ pub struct Score {
     pub total_labels: usize,
     pub caught: usize,
     pub recall: f64,
+    pub precision: f64,
     pub leakage: usize,
     pub over_redactions: usize,
     pub hard_total: usize,
@@ -65,7 +66,11 @@ pub fn score_note(predicted: &[Span], expected: &Expected, acc: &mut Score) {
     }
     // Over-redaction: a predicted span overlapping no label (recall-first: reported, not gated).
     for p in predicted {
-        if !expected.redactions.iter().any(|e| matches(&p.text, &e.text)) {
+        if !expected
+            .redactions
+            .iter()
+            .any(|e| matches(&p.text, &e.text))
+        {
             acc.over_redactions += 1;
         }
     }
@@ -76,6 +81,12 @@ pub fn finalize(acc: &mut Score) {
     acc.leakage = acc.missed.len();
     acc.recall = if acc.total_labels > 0 {
         acc.caught as f64 / acc.total_labels as f64
+    } else {
+        1.0
+    };
+    let predicted_total = acc.caught + acc.over_redactions;
+    acc.precision = if predicted_total > 0 {
+        acc.caught as f64 / predicted_total as f64
     } else {
         1.0
     };
@@ -98,8 +109,16 @@ mod tests {
             id: "note-01".into(),
             clean: false,
             redactions: vec![
-                ExpectedSpan { text: "Maria Alvarez".into(), entity: "PERSON".into(), hard: true },
-                ExpectedSpan { text: "CM-204815".into(), entity: "MEMBER_ID".into(), hard: false },
+                ExpectedSpan {
+                    text: "Maria Alvarez".into(),
+                    entity: "PERSON".into(),
+                    hard: true,
+                },
+                ExpectedSpan {
+                    text: "CM-204815".into(),
+                    entity: "MEMBER_ID".into(),
+                    hard: false,
+                },
             ],
         };
         let mut acc = Score::default();

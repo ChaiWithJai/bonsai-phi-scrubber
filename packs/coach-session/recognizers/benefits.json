@@ -1,0 +1,9 @@
+{
+  "name": "coach_benefit_id",
+  "supported_entity": "BENEFIT_ID",
+  "description": "Benefit/program identifier format added by pack config, without forking the core.",
+  "patterns": [
+    { "name": "benefit_id", "regex": "\\bBEN-[A-Z]{2}-\\d{4}\\b", "score": 0.95 }
+  ],
+  "context": ["benefit id", "program code", "ref"]
+}

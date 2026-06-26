@@ -27,15 +27,15 @@ Belief shouldn't come from a pitch — it comes from `./run.sh eval` printing th
 git clone https://github.com/ChaiWithJai/airplane-mode && cd airplane-mode
 
 # 1. get + serve the model (one-time; ~5 min). See docs/model-setup.md for details.
-./scripts/serve-model.sh            # downloads Ternary-Bonsai-1.7B (Apache-2.0) + serves on :8080
+./scripts/serve-model.sh            # downloads pinned Ternary-Bonsai-1.7B + verifies sha256 + serves on :8080
 
-# 2. reproduce the de-identification numbers through the owned Rust core
+# 2. check the committed de-identification numbers through the owned Rust core
 ./run.sh eval
 ```
 
-You should see **rules ∪ Bonsai-1.7B → 100% recall / 0 leakage** on the 20-note synthetic golden set — the same `airplane-core` the demo runs. (Recall and leakage reproduce; exact over-redaction counts may vary slightly across machines — tracked in [issue #12](../../issues/12).) Full setup, including the model footguns, is in **[docs/model-setup.md](docs/model-setup.md)**.
+You should see **rules ∪ Bonsai-1.7B → 100% recall / 0 leakage** on the 21-note synthetic golden set — the same `airplane-core` the demo runs. `./run.sh eval` compares the run to the committed `eval/golden-run.txt`; use `./run.sh eval --update` only when intentionally refreshing that target. Full setup, including the model footguns, is in **[docs/model-setup.md](docs/model-setup.md)**.
 
-> Needs: a Mac (or Linux), the Rust toolchain, and `llama.cpp` (`brew install llama.cpp`). The model is **free under Apache 2.0** from `prism-ml/` on Hugging Face.
+> Needs: a Mac (or Linux), the Rust toolchain, and `llama.cpp` (`brew install llama.cpp`). The model is **free under Apache 2.0** from `prism-ml/` on Hugging Face and is fetched from a pinned repo commit with SHA-256 verification.
 
 ---
 
@@ -43,10 +43,10 @@ You should see **rules ∪ Bonsai-1.7B → 100% recall / 0 leakage** on the 20-n
 
 ```bash
 ./scripts/serve-model.sh    # the model (terminal 1)
-./run.sh web                # the UI (terminal 2) — prints a LAN URL
+AIRPLANE_WEB_ADDR=0.0.0.0:8099 ./run.sh web   # the UI (terminal 2) — prints a LAN URL
 ```
 
-Open the printed `http://<laptop-ip>:8088` on a phone on the same Wi-Fi (or your iPhone hotspot — see the runbook). Dictate → **Scrub on device** → the name/ID/date/relationship get caught → the gate clears → the de-identified card **posts to Slack**. The full runbook, the Wi-Fi-isolation fix, and the 2-minute Slack-webhook setup are in **[docs/demo/onboarding.md](docs/demo/onboarding.md)**.
+Open the printed `http://<laptop-ip>:8099` on a phone on the same Wi-Fi (or your iPhone hotspot — see the runbook). Dictate → **Scrub on device** → the name/ID/date/relationship get caught → the gate clears → the de-identified card **posts to Slack**. The full runbook, the Wi-Fi-isolation fix, and the 2-minute Slack-webhook setup are in **[docs/demo/onboarding.md](docs/demo/onboarding.md)**.
 
 ---
 
@@ -96,11 +96,12 @@ Built as a **harnessed loop** (`AGENTS.md` + `backlog/` + `gates/`), reproducibl
 | Path | What |
 |---|---|
 | `crates/airplane-core/` | the portable Rust trust core (rules · gate · pipeline · pack loader) |
-| `shells/web/` · `shells/cli/` | the live Beat 1 demo · the reproduction front door |
+| `shells/web/` · `shells/cli/` · `shells/mcp/` | the live Beat 1 demo · the reproduction front door · the agent-callable shell |
 | `packs/coach-session/` | the reference pack + 20 golden notes |
 | `eval/golden-run.txt` | the committed reproduction target |
 | `docs/` | model setup · phone runbook · extending guide · architecture spec |
 | `files/` · `CANON.md` | the design canon (RFCs, ADRs) and its index |
-| `run.sh` | one entrypoint: `eval · scrub · gates · web` |
+| `run.sh` | one entrypoint: `eval · scrub · gates · web · mcp` |
+| `scripts/smoke-mcp-cli-parity.sh` | MCP-vs-CLI parity smoke over golden notes |
 
 *Built to make intelligence come to the data — not the other way around.*

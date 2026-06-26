@@ -6,15 +6,13 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#16120e">
 <title>Airplane Mode</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#e7e3d8; --paper:#f5f1e8; --card:#fcfaf4; --ink:#221f19; --mut:#6b6456;
     --line:#ece4d4; --gold:#b87814; --gold2:#c6912f; --green:#1f7a4d; --green2:#4fd08c;
     --red:#bf3b2b; --amber:#8a5a0f;
-    --sans:'Hanken Grotesk',-apple-system,system-ui,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',system-ui,sans-serif;
+    --mono:'SF Mono','SFMono-Regular',ui-monospace,Menlo,Consolas,monospace;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
   html,body{margin:0;height:100%}
@@ -26,6 +24,7 @@
   @keyframes glow{0%,100%{box-shadow:0 0 0 0 rgba(54,194,129,0)}50%{box-shadow:0 0 30px 1px rgba(54,194,129,.4)}}
   @keyframes spin{to{transform:rotate(360deg)}}
   @keyframes pop{0%{opacity:0;transform:translateY(6px) scale(.96)}100%{opacity:1;transform:none}}
+  @keyframes pulse{0%,100%{transform:scale(1);box-shadow:0 18px 34px -20px rgba(184,120,20,.6)}50%{transform:scale(1.025);box-shadow:0 22px 44px -18px rgba(184,120,20,.8)}}
 
   /* device: FULL-BLEED on real phones (the phone is the frame); a device frame only
      on desktop pointers. */
@@ -59,9 +58,25 @@
   .sw.on{background:var(--gold)} .sw.on b{right:3px} .sw.off{background:#2f6f4c} .sw.off b{left:3px}
   .note{background:var(--card);border:1.5px solid #ece4d4;border-radius:16px;padding:16px;
     font:400 14.5px/1.65 var(--sans);color:#3a352c;flex:1;min-height:0;overflow:auto;width:100%;resize:none;outline:none}
+  .note:focus{border-color:#c6912f;box-shadow:0 0 0 3px rgba(198,145,47,.16)}
   .chip{font:600 11px var(--sans);color:#3a352c;background:#efe9da;border-radius:8px;padding:5px 9px;display:inline-block}
   .pill{font:600 9px/1 var(--mono);border-radius:20px;padding:4px 8px;display:inline-flex;align-items:center;gap:4px}
   .code{font:500 10.5px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;color:#4f493f;background:#f7f1e5;border:1px solid var(--line);border-radius:10px;padding:10px}
+  .micbtn{display:flex;align-items:center;justify-content:center;gap:11px;width:100%;border:0;border-radius:18px;
+    padding:17px 18px;background:linear-gradient(180deg,#c6912f,#a86610);color:#fff;cursor:pointer;
+    font:800 16px var(--sans);box-shadow:0 18px 34px -20px rgba(184,120,20,.72)}
+  .micbtn.listening{animation:pulse 1.25s ease-in-out infinite;background:linear-gradient(180deg,#1f7a4d,#155f3a)}
+  .micorb{width:33px;height:33px;border-radius:50%;background:rgba(255,255,255,.18);display:inline-flex;align-items:center;justify-content:center;font-size:17px}
+  .captureTop{display:flex;align-items:center;gap:10px;margin-top:4px}
+  .brandMark{width:28px;height:28px;border-radius:9px;background:var(--ink);display:flex;align-items:center;justify-content:center;color:var(--gold2);font-size:14px;flex:none}
+  .captureHero{margin-top:14px;background:linear-gradient(180deg,#fffaf0,#f4ead7);border:1.5px solid #eadfca;border-radius:20px;padding:16px 16px 15px;box-shadow:0 18px 44px -36px rgba(80,55,18,.45)}
+  .captureHero h1{font-size:34px;line-height:.95;letter-spacing:0;margin-top:8px}
+  .sinkLine{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:13px;border-top:1px solid #eadfca;padding-top:11px}
+  .sinkBadges{display:flex;align-items:center;gap:5px;flex:none}
+  .sinkState{font:700 10px var(--mono);letter-spacing:0;border-radius:999px;padding:5px 8px;border:1px solid}
+  .sampleBtn{font:700 12px var(--sans);color:var(--gold);background:#f6ecd6;border:1px solid #e3c98a;border-radius:999px;padding:8px 11px;cursor:pointer}
+  .noteMeta{display:flex;align-items:center;justify-content:space-between;margin-top:10px}
+  .btn.disabled{background:#d9d0bd;color:#8a8273;cursor:default;box-shadow:none}
   .mono{font-family:var(--mono)}
   .grow{flex:1;min-height:0}
   .center{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
@@ -87,7 +102,8 @@
 
 <script>
 const NOTE = "Met with Maria Alvarez (CM-204815) at her place Tuesday. She's the one whose daughter just started college. Committed to a 10-min morning walk daily.";
-const S = { airplane:true, screen:'capturing', note:'', result:null, error:null, posted:false, sendNote:'', packDemo:null, packError:null };
+const S = { screen:'capturing', note:'', result:null, error:null, posted:false, sendNote:'', trajectoryCount:0, trajectoryNote:'', packDemo:null, packError:null, listening:false, speechMsg:'', status:null };
+let recognizer = null;
 
 const $phone = document.getElementById('phone');
 const $screen = document.getElementById('screen');
@@ -101,30 +117,41 @@ function clock(ampm){
   return ampm ? `${h}:${m} ${ap}` : `${h}:${m}`;
 }
 
-function toggleHTML(label, dark){
-  const cls = S.airplane ? 'on' : 'off';
-  const col = dark ? '#cfd6cd' : '#221f19';
-  const icon = dark ? '#8c8475' : '#b87814';
-  return `<div class="toggle" data-act="toggle" style="${dark?'background:rgba(255,255,255,.02);border-color:#243029':''}">
-    <span style="display:flex;align-items:center;gap:10px"><span style="color:${icon};font-size:15px">✈</span>
-    <span style="font:600 13px var(--sans);color:${col}">${label}</span></span>
-    <span class="sw ${cls}"><b></b></span></div>`;
-}
-
 // ---------- screens ----------
 const screens = {
- capturing(){ setDark(false); return `
-   <div style="display:flex;align-items:center;gap:9px;margin-top:4px">
-     <div style="width:26px;height:26px;border-radius:8px;background:var(--ink);display:flex;align-items:center;justify-content:center;color:var(--gold2);font-size:13px">✈</div>
-     <div style="font:700 15px var(--sans);letter-spacing:-.01em">New session</div>
-     <span class="pill" style="margin-left:auto;color:var(--amber);background:#f6ecd6;border:1px solid #e3c98a">✈ offline</span></div>
-   <div class="sub" style="margin-top:11px;font-size:13px">Speak or type the session note. Dictation runs <b style="color:var(--ink)">on your device</b> — tap the field, then the&nbsp;🎤&nbsp;on your keyboard.</div>
-   <textarea class="note" style="margin-top:12px" placeholder="Tap here, then dictate or type the session…" oninput="S.note=this.value">${esc(S.note)}</textarea>
-   <div style="display:flex;align-items:center;justify-content:space-between;margin-top:11px">
-     <span data-act="sample" style="font:600 12px var(--sans);color:var(--gold);cursor:pointer;border-bottom:1px solid #e3c98a">Use a sample note</span>
-     <span class="mono" style="font-size:10px;color:#8a8273">raw text stays on device</span></div>
+ capturing(){ setDark(false);
+   const hasNote = !!S.note.trim();
+   const slackConfigured = S.status&&S.status.slack&&S.status.slack.configured;
+   const slackRoute = S.status&&S.status.slack?`${S.status.slack.route} -> ${S.status.slack.channel||'#coach-records'}`:'checking sink';
+   const modelReachable = !!(S.status&&S.status.model&&S.status.model.reachable);
+   const canSpeech = !!speechRecognitionCtor();
+   const dictLabel = S.listening ? 'Listening…' : (canSpeech ? 'Start dictation' : 'Use keyboard mic');
+   return `
+   <div class="captureTop">
+     <div class="brandMark">✈</div>
+     <div style="font:700 15px var(--sans);letter-spacing:0">New session</div>
+     <span class="pill" style="margin-left:auto;color:var(--amber);background:#f6ecd6;border:1px solid #e3c98a">local</span></div>
+   <div class="captureHero">
+     <div class="mono" style="font-size:10px;color:#a39a86;letter-spacing:.08em">CAPTURE</div>
+     <h1>Dictate the session</h1>
+     <button class="micbtn ${S.listening?'listening':''}" data-act="dictate" style="margin-top:13px">
+       <span class="micorb">${S.listening?'■':'🎙'}</span><span>${dictLabel}</span>
+     </button>
+     <div class="sinkLine">
+       <div id="captureMsg" class="mono" style="font-size:10px;color:${S.speechMsg?'var(--amber)':'#a39a86'}">${esc(S.speechMsg||'edge capture · verifier gated')}</div>
+       <div class="sinkBadges">
+         <span class="sinkState" style="color:${modelReachable?'var(--green)':'var(--amber)'};background:${modelReachable?'#e6f0e7':'#f6ecd6'};border-color:${modelReachable?'#bfdcc6':'#e3c98a'}">model ${modelReachable?'ready':'off'}</span>
+         <span class="sinkState" style="color:${slackConfigured?'var(--green)':'var(--amber)'};background:${slackConfigured?'#e6f0e7':'#f6ecd6'};border-color:${slackConfigured?'#bfdcc6':'#e3c98a'}">Slack ${slackConfigured?'live':'preview'}</span>
+       </div>
+     </div>
+     <div class="mono" style="margin-top:7px;font-size:9px;color:#a39a86;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(slackRoute)}</div>
+   </div>
+   <textarea id="noteInput" class="note" style="margin-top:12px" placeholder="Session note appears here…" oninput="handleNoteInput(this.value)">${esc(S.note)}</textarea>
+   <div class="noteMeta">
+     <button data-act="sample" class="sampleBtn">Use sample note</button>
+     <span id="wordCount" class="mono" style="font-size:10px;color:#8a8273">${S.note.trim()?S.note.trim().split(/\s+/).length:0} words</span></div>
    <div class="grow"></div>
-   <button class="btn" data-act="scrub">Scrub on device</button>`; },
+   <button class="btn ${hasNote?'':'disabled'}" data-act="scrub">${hasNote?'Scrub on device':'Waiting for note'}</button>`; },
 
  scrubbing(){ setDark(true,false);
    // error state
@@ -186,7 +213,9 @@ const screens = {
    const rec=S.result.record;
    const themes=(rec.themes||[]);
    const coms=(rec.commitments||[]);
-   const sendLabel = S.airplane ? 'Send to #coach-records' : 'Send to #coach-records';
+   const follow=(rec.follow_ups||[]);
+   const risks=(rec.risk_flags||[]);
+   const signal=(rec.autonomy_delta&&rec.autonomy_delta.signals||[]).join(' · ');
    return `
    <div style="display:flex;align-items:center;justify-content:space-between">
      <div style="font:700 17px var(--sans);letter-spacing:-.01em">Care record</div>
@@ -202,41 +231,26 @@ const screens = {
      ${coms.map(c=>`<div style="display:flex;align-items:center;justify-content:space-between;margin-top:9px">
         <span style="font:500 13px var(--sans)">${esc(c.text||c)}</span>
         <span class="mono" style="font-size:9px;font-weight:700;color:var(--amber);background:#f6ecd6;border-radius:5px;padding:3px 7px">${esc((c.status||'open').toUpperCase())}</span></div>`).join('')||'<div class="sub" style="margin-top:8px">—</div>'}
+     <div style="height:1px;background:var(--line);margin:14px 0"></div>
+     <div class="mono" style="font-size:10px;color:#a39a86;letter-spacing:.05em">FOLLOW_UP</div>
+     <div style="font:500 13px/1.45 var(--sans);margin-top:8px;color:#3a352c">${esc(follow[0]||'—')}</div>
+     ${signal?`<div class="mono" style="font-size:9px;color:#7a8b73;margin-top:7px">reward: ${esc(signal)}</div>`:''}
      <div style="height:1px;background:var(--line);margin:13px 0"></div>
      <div style="display:flex;gap:18px">
-       <div><div class="mono" style="font-size:10px;color:#a39a86">RISK_FLAGS</div><div style="font:600 13px var(--sans);color:#5b8068;margin-top:6px">none</div></div>
+       <div><div class="mono" style="font-size:10px;color:#a39a86">RISK_FLAGS</div><div style="font:600 13px var(--sans);color:${risks.length?'var(--red)':'#5b8068'};margin-top:6px">${esc(risks.join(' · ')||'none')}</div></div>
        <div><div class="mono" style="font-size:10px;color:#a39a86">NEXT_TOUCH</div><div class="mono" style="font:600 13px var(--mono);margin-top:6px">${esc(rec.next_touch||'—')}</div></div>
      </div>
    </div>
    <div class="mono" style="display:flex;align-items:center;gap:7px;margin-top:12px;font-size:11px;font-weight:600;color:var(--amber)">
-     <span style="font-size:13px">✈</span>${S.airplane?'still offline · not yet sent':'online'}</div>
-   <button class="btn" data-act="send" style="margin-top:11px">${sendLabel}</button>`; },
-
- held(){ setDark(false); return `
-   <div style="font:700 17px var(--sans);letter-spacing:-.01em">Sending…</div>
-   <div style="margin-top:16px;background:#fbf2dd;border:1.5px solid #e3c98a;border-radius:16px;padding:15px;display:flex;gap:12px;align-items:flex-start">
-     <div style="width:30px;height:30px;flex:none;border-radius:9px;background:#f3e2bd;display:flex;align-items:center;justify-content:center;color:var(--gold);font-size:16px">✈</div>
-     <div><div style="font:700 14px var(--sans);color:var(--amber)">No network — radios off</div>
-       <div style="font:400 12.5px/1.5 var(--sans);color:#9a7a3a;margin-top:4px">Nothing leaves the device. The clean record is held until you reconnect.</div></div></div>
-   <div style="margin-top:16px;background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:14px">
-     <div style="display:flex;align-items:center;justify-content:space-between">
-       <span class="mono" style="font-size:12px;font-weight:600;color:#736c5d;letter-spacing:.03em">OUTBOX</span>
-       <span class="mono" style="font-size:10px;font-weight:700;color:var(--amber);background:#f6ecd6;border:1px solid #e3c98a;border-radius:20px;padding:4px 9px">QUEUED · 1</span></div>
-     <div style="display:flex;align-items:center;gap:11px;margin-top:13px">
-       <div class="mono" style="width:34px;height:34px;flex:none;border-radius:9px;background:#efe9da;display:flex;align-items:center;justify-content:center;font:700 12px var(--mono);color:#736c5d">${esc((S.result.record.client_pseudonym||'7F3A').slice(-2))}</div>
-       <div style="flex:1"><div style="font:600 13px var(--sans)">${esc(S.result.record.client_pseudonym||'CLIENT')} · care record</div>
-         <div class="mono" style="font-size:11px;color:#a39a86;margin-top:3px">clean · awaiting network</div></div>
-       <span style="width:8px;height:8px;border-radius:50%;background:var(--gold)"></span></div></div>
-   <div class="grow" style="display:flex;align-items:flex-end">
-     <div style="font:600 16px/1.35 var(--sans);letter-spacing:-.01em">It refuses to send.<br><span style="color:var(--amber)">Good — that's the proof.</span></div></div>
-   ${toggleHTML('Airplane mode — turn off to send', false)}`; },
+     <span style="font-size:13px">→</span>gate-clean · ready for Slack sink</div>
+   <button class="btn" data-act="send" style="margin-top:11px">Send to #coach-records</button>`; },
 
  flush(){ setDark(true,true); return `
-   <div style="font:700 18px var(--sans);color:#eef4ee;letter-spacing:-.01em">Connectivity restored</div>
+   <div style="font:700 18px var(--sans);color:#eef4ee;letter-spacing:-.01em">Sending to Slack</div>
    ${ '' }
    <div style="display:flex;align-items:center;justify-content:space-between;border:1px solid #243029;background:rgba(255,255,255,.02);border-radius:14px;padding:12px 14px;margin-top:15px">
-     <div style="display:flex;align-items:center;gap:10px"><span style="color:#8c8475;font-size:15px">✈</span><span style="font:600 13px var(--sans);color:#cfd6cd">Airplane mode</span></div>
-     <span class="sw off"><b></b></span></div>
+     <div style="display:flex;align-items:center;gap:10px"><span style="color:#8c8475;font-size:15px">→</span><span style="font:600 13px var(--sans);color:#cfd6cd">Slack sink</span></div>
+     <span class="pill" style="color:#9bd9b3;border:1px solid #2c4a38;background:rgba(54,194,129,.08)">VERIFYING</span></div>
    <div class="grow center" style="gap:20px">
      <div style="position:relative;width:78px;height:78px;display:flex;align-items:center;justify-content:center">
        <div style="position:absolute;inset:0;border-radius:50%;border:3px solid #1b2c22"></div>
@@ -253,12 +267,14 @@ const screens = {
    return `
    <div class="grow center" style="gap:18px">
      <div style="width:62px;height:62px;border-radius:50%;background:${S.posted?'var(--green)':'#e3c98a'};display:flex;align-items:center;justify-content:center;color:#fff;font-size:30px;box-shadow:0 14px 30px -10px rgba(31,122,77,.4)">${S.posted?'✓':'✈'}</div>
-     <div><h1 style="font-size:30px">${S.posted?'Posted':'Held'}</h1>
-       <div class="sub" style="margin-top:8px">${S.posted?'Clean record landed in<br><span class="mono" style="font-weight:700;color:var(--ink)">#coach-records</span>':esc(S.sendNote||'Set SLACK_WEBHOOK_URL to post for real')}</div></div></div>
+     <div><h1 style="font-size:30px">${S.posted?'Posted':'Not posted'}</h1>
+       <div class="sub" style="margin-top:8px">${S.posted?'Clean record landed in<br><span class="mono" style="font-weight:700;color:var(--ink)">#coach-records</span>':esc(S.sendNote||'Set SLACK_WEBHOOK_URL or SLACK_BOT_TOKEN to post for real')}</div></div></div>
    <div style="background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:9px" class="mono">
      <div style="display:flex;justify-content:space-between;font-size:12px;color:#736c5d"><span>record</span><span style="color:var(--ink)">${esc(rec.client_pseudonym||'CLIENT')}</span></div>
      <div style="display:flex;justify-content:space-between;font-size:12px;color:#736c5d"><span>identifiers sent</span><span style="color:var(--green);font-weight:700">0</span></div>
+     <div style="display:flex;justify-content:space-between;font-size:12px;color:#736c5d"><span>trajectory env</span><span style="color:${S.trajectoryCount?'var(--green)':'var(--amber)'};font-weight:700">${S.trajectoryCount||'—'}</span></div>
      <div style="display:flex;justify-content:space-between;font-size:12px;color:#736c5d"><span>raw note left the edge</span><span style="color:var(--green);font-weight:700">never</span></div></div>
+   <div class="mono" style="font-size:10px;color:#8a8273;margin-top:9px">${esc(S.trajectoryNote||'gate-clean trajectories only')}</div>
    <div style="font:600 15px/1.4 var(--sans);margin-top:14px;letter-spacing:-.01em">The real name never reached the cloud. Only this did.</div>
    <div style="display:flex;gap:9px;margin-top:12px">
      <button class="btn" data-act="slack" style="background:#3a1f3a;padding:14px">View Slack</button>
@@ -280,6 +296,7 @@ const screens = {
    const d=S.packDemo;
    const added=JSON.stringify(d.added_recognizer,null,2);
    const caught=(d.after_redactions||[]).find(r=>r.entity==='BENEFIT_ID');
+   const files=d.pack_files||[];
    return `
    <div style="display:flex;align-items:center;justify-content:space-between">
      <div style="font:700 17px var(--sans);letter-spacing:-.01em">Pack reveal</div>
@@ -287,6 +304,17 @@ const screens = {
    <div style="margin-top:12px;display:flex;gap:7px;flex-wrap:wrap">
      ${(d.gates||[]).map(g=>`<span class="pill" style="color:${g.pass?'var(--green)':'var(--red)'};background:${g.pass?'#e6f0e7':'#fff1ed'};border:1px solid ${g.pass?'#bfdcc6':'#e5b2a8'}">${g.pass?'✓':'×'} ${esc(g.name)}</span>`).join('')}</div>
    <div style="flex:1;min-height:0;margin-top:12px;overflow:auto;display:flex;flex-direction:column;gap:10px">
+     <div>
+       <div class="mono" style="font-size:10px;color:#a39a86;letter-spacing:.05em;margin-bottom:5px">FIVE-FILE PACK</div>
+       <div style="display:grid;grid-template-columns:1fr;gap:6px">
+         ${files.map(f=>`<div style="background:var(--card);border:1.5px solid var(--line);border-radius:10px;padding:9px 10px">
+           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+             <span class="mono" style="font-size:10px;font-weight:800;color:var(--gold);text-transform:uppercase">${esc(f.role)}</span>
+             <span class="mono" style="font-size:9px;color:#8a8273;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.path)}</span>
+           </div>
+           <div class="mono" style="font-size:9px;line-height:1.45;color:#736c5d;margin-top:6px;max-height:52px;overflow:hidden;white-space:pre-wrap">${esc(f.preview||'')}</div>
+         </div>`).join('')}</div>
+     </div>
      <div>
        <div class="mono" style="font-size:10px;color:#a39a86;letter-spacing:.05em;margin-bottom:5px">ADDED RECOGNIZER</div>
        <div class="code">${esc(added)}</div>
@@ -316,9 +344,10 @@ function render(){
 
 async function onAct(e){
   const act = e.currentTarget.getAttribute('data-act');
-  if(act==='toggle'){ S.airplane=!S.airplane; if(S.screen==='held' && !S.airplane){ go('flush'); return doSend(); } return render(); }
-  if(act==='sample'){ S.note=NOTE; return render(); }
+  if(act==='dictate') return toggleDictation();
+  if(act==='sample'){ S.note=NOTE; S.speechMsg='sample loaded'; return render(); }
   if(act==='scrub'){
+    if(e.currentTarget.classList.contains('disabled')){ focusNote(); return; }
     if(!S.note.trim()){ alert('Dictate or type a note first — or tap “Use a sample note”.'); return; }
     go('scrubbing'); return doScrub();
   }
@@ -326,11 +355,86 @@ async function onAct(e){
   if(act==='back') return go('capturing');
   if(act==='gate') return go('gated');
   if(act==='record') return go('record');
-  if(act==='send') return go(S.airplane ? 'held' : 'flush');
+  if(act==='send'){ go('flush'); return doSend(); }
   if(act==='slack') return showSlack();
   if(act==='pack'){ go('pack'); return doPackReveal(); }
   if(act==='packRetry'){ S.packDemo=null; S.packError=null; go('pack'); return doPackReveal(); }
   if(act==='backRecord') return go('delivered');
+}
+
+function noteInput(){
+  return document.getElementById('noteInput');
+}
+
+function updateCaptureControls(){
+  const hasNote = !!S.note.trim();
+  const wc = document.getElementById('wordCount');
+  if(wc) wc.textContent = `${hasNote ? S.note.trim().split(/\s+/).length : 0} words`;
+  const cm = document.getElementById('captureMsg');
+  if(cm) cm.textContent = S.speechMsg || 'edge capture · verifier gated';
+  const scrub = $screen.querySelector('[data-act="scrub"]');
+  if(scrub){
+    scrub.classList.toggle('disabled', !hasNote);
+    scrub.textContent = hasNote ? 'Scrub on device' : 'Waiting for note';
+  }
+}
+
+function handleNoteInput(value){
+  S.note = value;
+  updateCaptureControls();
+}
+
+function speechRecognitionCtor(){
+  return window.SpeechRecognition || window.webkitSpeechRecognition;
+}
+
+function focusNote(){
+  const n=noteInput();
+  if(n){ n.focus(); const len=n.value.length; try{ n.setSelectionRange(len,len); }catch(_){} }
+}
+
+function setCaptureNote(text, msg){
+  S.note = text.trim();
+  if(msg) S.speechMsg = msg;
+  const n = noteInput();
+  if(n && S.screen==='capturing'){
+    n.value = S.note;
+    updateCaptureControls();
+  } else {
+    render();
+  }
+}
+
+function toggleDictation(){
+  if(S.listening && recognizer){ try{ recognizer.stop(); }catch(_){} S.listening=false; S.speechMsg='dictation stopped'; render(); return; }
+  focusNote();
+  const SpeechRecognition = speechRecognitionCtor();
+  if(!SpeechRecognition){
+    S.speechMsg='keyboard mic ready';
+    render();
+    setTimeout(focusNote,0);
+    return;
+  }
+  recognizer = new SpeechRecognition();
+  recognizer.continuous = true;
+  recognizer.interimResults = true;
+  recognizer.lang = 'en-US';
+  let base = S.note.trim();
+  let finalTranscript = '';
+  recognizer.onstart = ()=>{ S.listening=true; S.speechMsg='capturing voice'; render(); };
+  recognizer.onresult = (event)=>{
+    let finalText = '', interim = '';
+    for(let i=0;i<event.results.length;i++){
+      const txt=event.results[i][0].transcript.trim();
+      if(event.results[i].isFinal) finalText += (finalText?' ':'') + txt;
+      else interim += (interim?' ':'') + txt;
+    }
+    finalTranscript = finalText;
+    setCaptureNote([base, finalTranscript, interim].filter(Boolean).join(' '), 'capturing voice');
+  };
+  recognizer.onerror = ()=>{ S.listening=false; S.speechMsg='keyboard mic ready'; render(); setTimeout(focusNote,0); };
+  recognizer.onend = ()=>{ S.listening=false; if(!S.speechMsg) S.speechMsg='dictation captured'; render(); };
+  try{ recognizer.start(); }catch(_){ S.speechMsg='keyboard mic ready'; render(); setTimeout(focusNote,0); }
 }
 
 async function doScrub(){
@@ -346,12 +450,40 @@ async function doScrub(){
 }
 
 async function doSend(){
-  S.posted=false; S.sendNote='';
+  S.posted=false; S.sendNote=''; S.trajectoryNote='';
+  const sendId = (crypto&&crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+  const body = JSON.stringify({record:S.result.record, send_id:sendId});
   // real Slack post, with a minimum dwell so the flush animation reads
-  const post = fetch('/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({record:S.result.record})})
-    .then(r=>r.json()).catch(()=>({ok:false,error:'could not reach the sink'}));
+  const postOnce = () => fetch('/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body})
+    .then(async r=>{
+      const data = await r.json().catch(()=>({ok:false,error:`edge returned non-JSON from /api/send (${r.status})`}));
+      if(!r.ok && !data.error) data.error = `edge rejected /api/send (${r.status})`;
+      return data;
+    });
+  const post = postOnce().catch(async ()=>{
+      const edge = await fetch('/api/health',{cache:'no-store'}).then(r=>r.ok).catch(()=>false);
+      if(edge){
+        await new Promise(r=>setTimeout(r,350));
+        return postOnce().catch(()=>({
+          ok:false,
+          error: `edge is reachable, but /api/send was interrupted before Slack acknowledged after retry`
+        }));
+      }
+      return {
+        ok:false,
+        error: `phone lost connection to edge server at ${location.host}`
+      };
+    });
   const [data] = await Promise.all([post, new Promise(r=>setTimeout(r,1900))]);
   S.posted = !!data.ok; S.sendNote = data.ok ? '' : (data.error||'');
+  if(data.ok){
+    const traj = await fetch('/api/trajectory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({record:S.result.record})})
+      .then(r=>r.json()).catch(()=>({ok:false,error:'trajectory store unavailable'}));
+    if(traj.ok){ S.trajectoryCount = traj.count; S.trajectoryNote = 'trajectory stored · gate-clean'; }
+    else { S.trajectoryNote = traj.error || 'trajectory not stored'; }
+  } else {
+    S.trajectoryNote = 'trajectory not stored · Slack send failed';
+  }
   go('delivered');
 }
 
@@ -371,6 +503,8 @@ function showSlack(){
   const rec=S.result.record;
   const themes=(rec.themes||[]).join(' · ');
   const com=(rec.commitments||[])[0];
+  const follow=(rec.follow_ups||[])[0]||'—';
+  const risks=(rec.risk_flags||[]).join(' · ')||'none';
   $scard.innerHTML = `
    <div style="background:#3a1f3a;padding:13px 16px;display:flex;align-items:center;gap:10px">
      <div style="display:flex;gap:7px"><span style="width:11px;height:11px;border-radius:50%;background:#ff6159"></span><span style="width:11px;height:11px;border-radius:50%;background:#ffbe2f"></span><span style="width:11px;height:11px;border-radius:50%;background:#2bca44"></span></div>
@@ -389,6 +523,8 @@ function showSlack(){
              <span class="mono" style="font-size:11px;color:#a39a86">CLIENT</span><span class="mono" style="font-weight:600">${esc(rec.client_pseudonym)}</span>
              <span class="mono" style="font-size:11px;color:#a39a86">THEMES</span><span style="color:#3a352c">${esc(themes)||'—'}</span>
              <span class="mono" style="font-size:11px;color:#a39a86">COMMITMENT</span><span style="color:#3a352c">${esc(com?com.text:'—')} · <span style="color:var(--amber);font-weight:600">open</span></span>
+             <span class="mono" style="font-size:11px;color:#a39a86">FOLLOW-UP</span><span style="color:#3a352c">${esc(follow)}</span>
+             <span class="mono" style="font-size:11px;color:#a39a86">RISK</span><span style="color:${risks==='none'?'#5b8068':'var(--red)'}">${esc(risks)}</span>
              <span class="mono" style="font-size:11px;color:#a39a86">NEXT TOUCH</span><span class="mono">${esc(rec.next_touch||'—')}</span>
            </div>
            <div class="mono" style="display:flex;align-items:center;gap:8px;margin-top:15px;border-top:1px solid #f0eadd;padding-top:11px;font-size:10px;color:#8aa692">
@@ -398,7 +534,7 @@ function showSlack(){
            <span style="font:700 13px var(--sans);color:var(--red)">↑ No name. No member ID.</span>
            <span style="font:500 12px var(--sans);color:#9a7a6e">Not redacted out — never structured in.</span></div>
        </div></div>
-     <div class="mono" style="font-size:10px;color:#a39a86;text-align:center;margin-top:16px">${S.posted?'✓ posted to #coach-records — open Slack to evaluate':'preview · set SLACK_WEBHOOK_URL to post for real'}</div>
+     <div class="mono" style="font-size:10px;color:#a39a86;text-align:center;margin-top:16px">${S.posted?'✓ posted to #coach-records — open Slack to evaluate':'preview · set SLACK_WEBHOOK_URL or SLACK_BOT_TOKEN to post for real'}</div>
      <button class="btn" data-act="close" onclick="document.getElementById('slack').style.display='none'" style="margin-top:12px;background:var(--ink)">Close</button>
    </div>`;
   $slack.style.display='flex';
@@ -406,6 +542,15 @@ function showSlack(){
 $slack.addEventListener('click',e=>{ if(e.target===$slack) $slack.style.display='none'; });
 
 render();
+refreshStatus();
+
+async function refreshStatus(){
+  try{
+    const res = await fetch('/api/status');
+    const data = await res.json();
+    if(data.ok){ S.status=data; if(S.screen==='capturing') render(); }
+  }catch(_){}
+}
 </script>
 </body>
 </html>

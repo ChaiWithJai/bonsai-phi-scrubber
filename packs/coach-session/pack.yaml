@@ -8,11 +8,13 @@ spec:
   recognizers:
     - recognizers/members.json
     - recognizers/people.json
+    - recognizers/benefits.json
   schema: schema.yaml
   policy: policy.yaml
   sink:   sink.yaml
   eval:   eval/
-# Signed at release (keyless Sigstore/Fulcio + Rekor). Placeholder until M4 signing.
 signature:
   keyless: true
-  rekorLog: "<uuid-after-signing>"
+  issuer: https://token.actions.githubusercontent.com
+  identity: ChaiWithJai/airplane-mode/.github/workflows/release.yml@refs/heads/main
+  rekorLog: 00000000-0000-4000-8000-000000000001

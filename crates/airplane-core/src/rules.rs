@@ -47,7 +47,10 @@ impl RulesExecutor {
     pub fn new() -> Self {
         let builtins: &[(&str, &str)] = &[
             ("SSN", r"\b\d{3}-\d{2}-\d{4}\b"),
-            ("PHONE", r"\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b"),
+            (
+                "PHONE",
+                r"\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b",
+            ),
             ("EMAIL", r"\b[\w.%+-]+@[\w.-]+\.[A-Za-z]{2,}\b"),
             ("DATE", r"\b\d{1,2}/\d{1,2}/\d{2,4}\b"),
             ("DATE", r"\b\d{4}-\d{2}-\d{2}\b"),
@@ -61,7 +64,10 @@ impl RulesExecutor {
                 re: Regex::new(r).expect("valid built-in regex"),
             })
             .collect();
-        Self { patterns, deny: Vec::new() }
+        Self {
+            patterns,
+            deny: Vec::new(),
+        }
     }
 
     /// Load a pack recognizer file (Presidio-style JSON) and compile its patterns.
@@ -73,11 +79,24 @@ impl RulesExecutor {
         for p in &spec.patterns {
             let re = Regex::new(&p.regex)
                 .with_context(|| format!("compile regex `{}` in {}", p.name, path.display()))?;
-            self.patterns.push(CompiledPattern { entity: spec.supported_entity.clone(), re });
+            self.patterns.push(CompiledPattern {
+                entity: spec.supported_entity.clone(),
+                re,
+            });
         }
         for lit in &spec.deny_list {
             self.deny.push((spec.supported_entity.clone(), lit.clone()));
         }
+        Ok(())
+    }
+
+    /// Add one regex recognizer at runtime. Shells use this for demos or adapters that
+    /// stage declarative pack changes before writing/signing a pack artifact.
+    pub fn add_regex(&mut self, entity: impl Into<String>, regex: &str) -> Result<()> {
+        self.patterns.push(CompiledPattern {
+            entity: entity.into(),
+            re: Regex::new(regex).with_context(|| format!("compile staged regex `{regex}`"))?,
+        });
         Ok(())
     }
 

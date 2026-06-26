@@ -60,7 +60,8 @@ PACK=packs/my-pack ./run.sh eval     # recall / leakage on your golden set
 PACK=packs/my-pack ./run.sh gates    # recall · leakage · pack-blindness
 ```
 
-If recall clears your threshold and nothing leaks, you're running the identical signed core with your identifiers — and you never touched a line of the code that matters. (Pack-path selection via `PACK=` is wired as packs land; today the reference pack is the default — see [issue #1](../../issues/1) for the full in-demo "five-file reveal".)
+If recall clears your threshold and nothing leaks, you're running the identical signed core with your identifiers — and you never touched a line of the code that matters. `PACK=` is honored by the CLI, web shell, MCP shell, and parity smoke; if the path is missing or invalid, pack loading fails closed.
+For custom packs, `PACK=... ./run.sh eval` prints that pack's metrics without overwriting the repo-level reference target. `./run.sh eval --update` is reserved for intentionally refreshing `eval/golden-run.txt` for the default pack.
 
 ## Why this is safe to open up
 
