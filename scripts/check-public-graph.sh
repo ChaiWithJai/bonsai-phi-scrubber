@@ -7,6 +7,7 @@ blocked=(
   '^spike/'
   '^docs/deprecations/spikes/'
   '^docs/superpowers/'
+  '^docs/repo-quality-benchmark\.md$'
   '^full-ctx\.md$'
   '^\.airplane/'
   '^\.playwright-mcp/'
