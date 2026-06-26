@@ -132,7 +132,10 @@ class Proxy(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         if self.command != "HEAD":
-            self.wfile.write(data)
+            try:
+                self.wfile.write(data)
+            except BrokenPipeError:
+                self.log_message("client disconnected before response body finished: %s", path)
 
 httpd = ThreadingHTTPServer((host, port), Proxy)
 ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
