@@ -58,6 +58,11 @@ Until that measurement exists:
 - do not list iOS as a hardware-proven shell
 - label the current `shells/ios` package as simulator choreography + interop scaffolding only
 
+There is also a browser-first alternative now worth measuring. See
+[`webgpu-vs-mlx.md`](webgpu-vs-mlx.md) for the comparison between native MLX
+Swift and browser WebGPU. The shared requirement is unchanged: local inference
+may vary, but the verifier gate still decides whether anything can leave.
+
 ## Future Real File Map
 
 These files are not created yet:

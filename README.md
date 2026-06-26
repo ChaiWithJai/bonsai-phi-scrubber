@@ -144,6 +144,10 @@ To verify the simulator-safe iOS scaffold and backend selector, run:
 That command runs SwiftPM tests/build for the mock `mlx-swift` and edge-HTTP
 backend modes. It does not prove real iPhone 11/A13 inference.
 
+For the next real phone path, compare native MLX Swift with browser WebGPU in
+[`docs/webgpu-vs-mlx.md`](docs/webgpu-vs-mlx.md). The recommendation is to
+measure both instead of assuming the native path wins.
+
 ## Wire Slack For A Real Post
 
 Without Slack credentials, the app still demos the scrub and verifier path, but
@@ -356,6 +360,7 @@ real iPhone 11 hardware proof.
 | `shells/ios/` | Simulator-safe native scaffold with selectable backend mocks. |
 | `packs/coach-session/` | Reference pack and synthetic eval set. |
 | `docs/model-setup.md` | Model download/runtime details. |
+| `docs/webgpu-vs-mlx.md` | Phone-path comparison: native MLX Swift vs browser WebGPU. |
 | `docs/contracts/` | Shared JSON contract fixtures for shell/backend interoperability. |
 | `docs/demo/onboarding.md` | Phone demo and Slack runbook. |
 | `docs/demo/reference-architecture.md` | CNCF-style adopter/builder reference architecture. |
