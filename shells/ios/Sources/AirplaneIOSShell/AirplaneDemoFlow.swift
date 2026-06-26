@@ -187,28 +187,110 @@ public struct DemoSecureStoreSnapshot: Equatable, Sendable {
     public let redactionCount: Int
 }
 
-public protocol AirplaneInferenceProvider: Sendable {
+public struct InferenceSampling: Codable, Equatable, Sendable {
+    public let temperature: Double
+    public let topK: Int
+    public let topP: Double
+    public let maxTokens: Int
+    public let seed: UInt64
+
+    public init(
+        temperature: Double = 0,
+        topK: Int = 1,
+        topP: Double = 1,
+        maxTokens: Int = 512,
+        seed: UInt64 = 11
+    ) {
+        self.temperature = temperature
+        self.topK = topK
+        self.topP = topP
+        self.maxTokens = maxTokens
+        self.seed = seed
+    }
+}
+
+public struct TextInferenceRequest: Codable, Equatable, Sendable {
+    public let system: String
+    public let user: String
+    public let jsonSchemaName: String
+    public let jsonSchema: String
+    public let sampling: InferenceSampling
+    public let backend: BackendSelection
+
+    public init(
+        system: String,
+        user: String,
+        jsonSchemaName: String,
+        jsonSchema: String,
+        sampling: InferenceSampling = InferenceSampling(),
+        backend: BackendSelection
+    ) {
+        self.system = system
+        self.user = user
+        self.jsonSchemaName = jsonSchemaName
+        self.jsonSchema = jsonSchema
+        self.sampling = sampling
+        self.backend = backend
+    }
+}
+
+public protocol TextInferenceProviding: Sendable {
+    var runtime: BackendRuntime { get }
+    func complete(_ request: TextInferenceRequest) throws -> String
+}
+
+public protocol AirplaneScrubBackend: Sendable {
     var runtime: BackendRuntime { get }
     func scrub(_ request: BackendScrubRequest) throws -> BackendScrubResponse
 }
 
-public struct SimulatorMLXSwiftTextProvider: AirplaneInferenceProvider {
+public struct SimulatorMLXSwiftTextInferenceProvider: TextInferenceProviding {
     public let runtime: BackendRuntime = .mlxSwiftMock
 
     public init() {}
 
-    public func scrub(_ request: BackendScrubRequest) throws -> BackendScrubResponse {
-        SimulatorBackend.scrub(request, layer: "mlx-swift-mock")
+    public func complete(_ request: TextInferenceRequest) throws -> String {
+        """
+        {"spans":[{"text":"Jordan Lee","entity":"PERSON"},{"text":"Maya","entity":"PERSON"},{"text":"COACH-4821","entity":"MEMBER_ID"},{"text":"March 12","entity":"DATE"}]}
+        """
     }
 }
 
-public struct SimulatorEdgeHTTPProvider: AirplaneInferenceProvider {
+public struct SimulatorEdgeHTTPTextInferenceProvider: TextInferenceProviding {
     public let runtime: BackendRuntime = .edgeHTTPMock
 
     public init() {}
 
+    public func complete(_ request: TextInferenceRequest) throws -> String {
+        """
+        {"spans":[{"text":"Jordan Lee","entity":"PERSON"},{"text":"Maya","entity":"PERSON"},{"text":"COACH-4821","entity":"MEMBER_ID"},{"text":"March 12","entity":"DATE"}]}
+        """
+    }
+}
+
+public struct SimulatorMLXSwiftScrubBackend: AirplaneScrubBackend {
+    public let runtime: BackendRuntime = .mlxSwiftMock
+    private let inference: TextInferenceProviding
+
+    public init(inference: TextInferenceProviding = SimulatorMLXSwiftTextInferenceProvider()) {
+        self.inference = inference
+    }
+
     public func scrub(_ request: BackendScrubRequest) throws -> BackendScrubResponse {
-        SimulatorBackend.scrub(request, layer: "edge-http-mock")
+        try SimulatorBackend.scrub(request, inference: inference, layer: "mlx-swift-mock")
+    }
+}
+
+public struct SimulatorEdgeHTTPScrubBackend: AirplaneScrubBackend {
+    public let runtime: BackendRuntime = .edgeHTTPMock
+    private let inference: TextInferenceProviding
+
+    public init(inference: TextInferenceProviding = SimulatorEdgeHTTPTextInferenceProvider()) {
+        self.inference = inference
+    }
+
+    public func scrub(_ request: BackendScrubRequest) throws -> BackendScrubResponse {
+        try SimulatorBackend.scrub(request, inference: inference, layer: "edge-http-mock")
     }
 }
 
@@ -281,7 +363,7 @@ public struct AirplaneDemoFlow: Equatable, Sendable {
         phase = .capturing
     }
 
-    public mutating func scrubAndGate(provider: AirplaneInferenceProvider? = nil) {
+    public mutating func scrubAndGate(provider: AirplaneScrubBackend? = nil) {
         guard phase == .capturing else { return }
 
         phase = .scrubbing
@@ -303,7 +385,7 @@ public struct AirplaneDemoFlow: Equatable, Sendable {
 
         scrubbedText = response.scrubbedText
         redactions = response.redactions
-        record = response.record
+        record = response.gatePass ? response.record : nil
         lastResponse = response
         secureStore.save(rawNote: capturedText, redactions: redactions)
         gateResult = DemoGateResult(passed: response.gatePass, residualCount: response.residualCount)
@@ -328,12 +410,12 @@ public struct AirplaneDemoFlow: Equatable, Sendable {
     }
 }
 
-private func defaultProvider(for runtime: BackendRuntime) -> AirplaneInferenceProvider {
+private func defaultProvider(for runtime: BackendRuntime) -> AirplaneScrubBackend {
     switch runtime {
     case .mlxSwiftMock:
-        SimulatorMLXSwiftTextProvider()
+        SimulatorMLXSwiftScrubBackend()
     case .edgeHTTPMock, .onDeviceMLXSwift:
-        SimulatorEdgeHTTPProvider()
+        SimulatorEdgeHTTPScrubBackend()
     }
 }
 
@@ -356,12 +438,14 @@ private struct SimulatorOnlySecureStore: Equatable, Sendable {
 }
 
 private enum SimulatorBackend {
-    private static let replacements: [(needle: String, entity: String, replacement: String)] = [
-        ("Jordan Lee", "PERSON", "[PERSON]"),
-        ("Maya", "PERSON", "[PERSON]"),
-        ("COACH-4821", "MEMBER_ID", "[MEMBER_ID]"),
-        ("March 12", "DATE", "[DATE]")
-    ]
+    private struct InferenceSpan: Decodable {
+        let text: String
+        let entity: String
+    }
+
+    private struct InferenceSpanResponse: Decodable {
+        let spans: [InferenceSpan]
+    }
 
     private static let blockedTokens = [
         "Jordan Lee",
@@ -370,13 +454,31 @@ private enum SimulatorBackend {
         "March 12"
     ]
 
-    static func scrub(_ request: BackendScrubRequest, layer: String) -> BackendScrubResponse {
+    static func scrub(
+        _ request: BackendScrubRequest,
+        inference: TextInferenceProviding,
+        layer: String
+    ) throws -> BackendScrubResponse {
+        let rawCompletion = try inference.complete(
+            TextInferenceRequest(
+                system: "Return only JSON spans for identifiers in the user's synthetic coaching note.",
+                user: request.text,
+                jsonSchemaName: "airplane.identifier_spans",
+                jsonSchema: #"{"type":"object","required":["spans"],"properties":{"spans":{"type":"array","items":{"type":"object","required":["text","entity"],"properties":{"text":{"type":"string"},"entity":{"type":"string"}}}}}}"#,
+                backend: request.backend
+            )
+        )
+        let spans = try JSONDecoder().decode(
+            InferenceSpanResponse.self,
+            from: Data(rawCompletion.utf8)
+        ).spans
+
         var output = request.text
         var redactions: [BackendRedaction] = []
 
-        for item in replacements where output.contains(item.needle) {
-            output = output.replacingOccurrences(of: item.needle, with: item.replacement)
-            redactions.append(BackendRedaction(entity: item.entity, layer: layer))
+        for span in spans where output.contains(span.text) {
+            output = output.replacingOccurrences(of: span.text, with: "[\(span.entity)]")
+            redactions.append(BackendRedaction(entity: span.entity, layer: layer))
         }
 
         let residualCount = blockedTokens.reduce(0) { count, token in

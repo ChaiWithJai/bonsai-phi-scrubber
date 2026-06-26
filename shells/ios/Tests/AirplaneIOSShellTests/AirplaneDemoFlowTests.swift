@@ -76,6 +76,46 @@ import Foundation
     #expect(flow.record?.clientPseudonym == "client ready circle")
 }
 
+@Test func simulatorMLXTextInferenceReturnsRawSchemaCompatibleSpans() throws {
+    let provider = SimulatorMLXSwiftTextInferenceProvider()
+    let raw = try provider.complete(
+        TextInferenceRequest(
+            system: "Return spans.",
+            user: AirplaneDemoFlow.sampleNote,
+            jsonSchemaName: "airplane.identifier_spans",
+            jsonSchema: #"{"type":"object"}"#,
+            backend: BackendSelection()
+        )
+    )
+
+    let object = try #require(JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String: Any])
+    let spans = try #require(object["spans"] as? [[String: Any]])
+
+    #expect(spans.count == 4)
+    #expect(spans.contains { $0["text"] as? String == "COACH-4821" && $0["entity"] as? String == "MEMBER_ID" })
+}
+
+@Test func simulatorScrubBackendUsesRawInferenceProvider() {
+    struct SingleSpanInference: TextInferenceProviding {
+        let runtime: BackendRuntime = .mlxSwiftMock
+
+        func complete(_ request: TextInferenceRequest) throws -> String {
+            #"{"spans":[{"text":"COACH-4821","entity":"MEMBER_ID"}]}"#
+        }
+    }
+
+    var flow = AirplaneDemoFlow()
+
+    flow.capture()
+    flow.scrubAndGate(provider: SimulatorMLXSwiftScrubBackend(inference: SingleSpanInference()))
+
+    #expect(flow.redactions == [BackendRedaction(entity: "MEMBER_ID", layer: "mlx-swift-mock")])
+    #expect(flow.scrubbedText.contains("[MEMBER_ID]"))
+    #expect(flow.scrubbedText.contains("Jordan Lee"))
+    #expect(flow.gateResult == DemoGateResult(passed: false, residualCount: 3))
+    #expect(flow.record == nil)
+}
+
 @Test func realMLXRuntimeIsVisibleButHardwareGatedInSimulator() {
     var flow = AirplaneDemoFlow()
 

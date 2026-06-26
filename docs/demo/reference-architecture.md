@@ -69,7 +69,7 @@ Builders extend the ports, not the trust rule:
 
 | Port | Current path | Next path |
 | --- | --- | --- |
-| `InferenceProvider` | `llama-server` over local HTTP | real `mlx-swift` text adapter |
+| `InferenceProvider` | `llama-server` over local HTTP; Swift `TextInferenceProviding` mock | real `mlx-swift` text adapter |
 | `Capture` | phone browser / CLI arg | native ASR or text capture |
 | `SecureStore` | simulator memory / local file | Keychain / Secure Enclave boundary |
 | `Sink` | Slack webhook or bot token | additional clean-record sinks |
@@ -80,10 +80,12 @@ The iOS package currently includes simulator mocks for two backend modes:
 - `Edge HTTP mock`
 - `On-device MLX Swift` visible as a locked hardware-gated target
 
-Both return the shared scrub response contract in `docs/contracts/`. That keeps
-the UI and tests interoperable while leaving the real `mlx-swift` text path open
-for a measured implementation. The locked target is intentional: it names the
-gap without letting Simulator imply a privacy or performance proof.
+Both runnable modes return the shared scrub response contract in `docs/contracts/`.
+The `MLX Swift mock` first emits raw JSON spans through `TextInferenceProviding`,
+then the simulator scrub backend applies redactions and gates the result. That
+keeps the UI and tests interoperable while leaving the real `mlx-swift` text path
+open for a measured implementation. The locked target is intentional: it names
+the gap without letting Simulator imply a privacy or performance proof.
 
 ## 5. Evidence Checklist
 

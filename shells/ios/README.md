@@ -14,6 +14,8 @@ M3 hardware proof.
   - `Edge HTTP mock`: simulator stand-in for the laptop `/api/scrub` JSON contract.
   - `On-device MLX Swift`: visible but locked in Simulator; this is the real hardware target
     that remains blocked on M3-T00 measurement.
+- Both mocks route through a lower-level `TextInferenceProviding.complete(...)` call that returns
+  raw JSON spans, then the simulator scrub backend applies replacements and the gate locally.
 - Both mocks return the same backend-shaped DTOs as the web shell uses conceptually:
   `scrubbed_text`, `redactions`, `gate_pass`, `residual_count`, and a scrubbed `record`.
   The shared contract fixture is `../../docs/contracts/scrub-response.sample.json`.
@@ -59,7 +61,9 @@ signed app target.
 
 ## Builder note
 
-The open contribution path is the real `InferenceProvider` adapter: unlock the
-`On-device MLX Swift` runtime with an `mlx-swift` implementation that accepts the same
-`BackendScrubRequest` shape and returns the same `BackendScrubResponse` shape, then run the M3-T00
-measurement on the oldest available iPhone before making any 2019/iPhone 11 claim.
+The open contribution path is the real text inference adapter: unlock the
+`On-device MLX Swift` runtime with an `mlx-swift` implementation of
+`TextInferenceProviding.complete(...)`. It should accept a schema-constrained prompt and return raw
+JSON spans; the scrub backend remains responsible for applying replacements, running the gate, and
+returning the shared `BackendScrubResponse` shape. Run the M3-T00 measurement on the oldest
+available iPhone before making any 2019/iPhone 11 claim.
