@@ -50,6 +50,8 @@ docs/positioning/community-hardware-lab-framework.md
 
 # Generated reports and logs
 eval/last-run.json
+eval/error-discovery/error_discovery_data/
+eval/error-discovery/traces.jsonl
 *.log
 *.tmp
 /*.png
