@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PHI Scrubber Error Discovery</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #0d1117;
+  color: #c9d1d9;
+  line-height: 1.6;
+}
+
+/* Top bar */
+.topbar {
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.topbar h1 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #58a6ff;
+  white-space: nowrap;
+}
+
+.topbar .tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.topbar .tab {
+  padding: 6px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #8b949e;
+  border: 1px solid transparent;
+  background: transparent;
+  transition: all 0.15s;
+}
+
+.topbar .tab:hover { color: #c9d1d9; background: #21262d; }
+.topbar .tab.active { color: #f0f6fc; background: #21262d; border-color: #30363d; }
+
+.topbar .stats {
+  margin-left: auto;
+  font-size: 12px;
+  color: #8b949e;
+  display: flex;
+  gap: 16px;
+}
+
+.topbar .stat-val { color: #58a6ff; font-weight: 600; }
+
+/* Navigation */
+.note-nav {
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  padding: 8px 24px;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+}
+
+.note-btn {
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: monospace;
+  color: #8b949e;
+  border: 1px solid #30363d;
+  background: #0d1117;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.note-btn:hover { border-color: #58a6ff; color: #c9d1d9; }
+.note-btn.active { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+.note-btn.annotated { border-color: #f0883e; }
+.note-btn.clean { opacity: 0.5; font-style: italic; }
+
+/* Views */
+.view { display: none; padding: 24px; }
+.view.active { display: block; }
+
+/* Article view */
+.article-container {
+  display: flex;
+  gap: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.article-body {
+  flex: 1;
+  max-width: 720px;
+}
+
+.article-header {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #30363d;
+}
+
+.article-header h2 {
+  font-size: 18px;
+  color: #f0f6fc;
+  margin-bottom: 8px;
+}
+
+.article-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.badge-person { background: #1f3d5c; color: #58a6ff; }
+.badge-org { background: #2d1f3d; color: #bc8cff; }
+.badge-date { background: #3d2d1f; color: #f0883e; }
+.badge-address { background: #1f3d2d; color: #3fb950; }
+.badge-email { background: #3d1f2d; color: #f778ba; }
+.badge-phone { background: #2d3d1f; color: #d2a8ff; }
+.badge-member-id { background: #1f2d3d; color: #79c0ff; }
+.badge-family { background: #3d3d1f; color: #e3b341; }
+.badge-location { background: #1f3d3d; color: #56d4dd; }
+.badge-benefit-id { background: #2d1f1f; color: #ff7b72; }
+.badge-other { background: #21262d; color: #8b949e; }
+.badge-clean { background: #1f2d1f; color: #3fb950; }
+.badge-hard { background: #3d1f1f; color: #f85149; font-size: 10px; }
+
+.note-text {
+  font-size: 15px;
+  line-height: 1.8;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 20px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  position: relative;
+}
+
+/* Identifier highlights in the note text */
+.phi-span {
+  border-radius: 3px;
+  padding: 1px 3px;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.15s;
+}
+
+.phi-span:hover { filter: brightness(1.3); }
+
+.phi-span.caught {
+  background: rgba(63, 185, 80, 0.2);
+  border-bottom: 2px solid #3fb950;
+}
+
+.phi-span.missed {
+  background: rgba(248, 81, 73, 0.2);
+  border-bottom: 2px solid #f85149;
+}
+
+.phi-span.over-redacted {
+  background: rgba(227, 179, 65, 0.2);
+  border-bottom: 2px solid #e3b341;
+}
+
+.phi-span.pending-highlight {
+  background: rgba(88, 166, 255, 0.3);
+  border-bottom: 2px solid #58a6ff;
+}
+
+/* Margin notes column */
+.margin-notes {
+  width: 280px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.margin-note {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  transition: all 0.15s;
+  border-left: 3px solid #30363d;
+}
+
+.margin-note:hover { border-color: #58a6ff; }
+.margin-note.caught { border-left-color: #3fb950; }
+.margin-note.missed { border-left-color: #f85149; }
+.margin-note.over-redacted { border-left-color: #e3b341; }
+
+.margin-note .entity-label {
+  font-weight: 600;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+.margin-note .entity-text {
+  color: #c9d1d9;
+  margin-bottom: 4px;
+}
+
+.margin-note .entity-status {
+  font-size: 11px;
+  color: #8b949e;
+}
+
+/* Annotation popover */
+.annotation-popover {
+  position: fixed;
+  background: #1c2128;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  z-index: 200;
+  width: 300px;
+  display: none;
+}
+
+.annotation-popover input {
+  width: 100%;
+  padding: 8px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  color: #c9d1d9;
+  font-size: 13px;
+  outline: none;
+}
+
+.annotation-popover input:focus { border-color: #58a6ff; }
+
+.annotation-popover .hint {
+  font-size: 11px;
+  color: #8b949e;
+  margin-top: 6px;
+}
+
+/* Human annotations in margin */
+.margin-note.human-annotation {
+  border-left-color: #58a6ff;
+  background: #1c2128;
+}
+
+.margin-note.human-annotation .annotation-text {
+  color: #58a6ff;
+  font-style: italic;
+}
+
+.margin-note .delete-btn {
+  float: right;
+  background: none;
+  border: none;
+  color: #f85149;
+  cursor: pointer;
+  font-size: 14px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.margin-note:hover .delete-btn { opacity: 1; }
+
+/* Map view */
+.map-container {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.map-canvas {
+  width: 100%;
+  height: 500px;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+}
+
+.map-legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.map-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.map-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+/* Progress view */
+.progress-container {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.progress-section {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.progress-section h3 {
+  font-size: 14px;
+  color: #f0f6fc;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #30363d;
+}
+
+.failure-mode-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.failure-mode {
+  padding: 12px;
+  background: #0d1117;
+  border-radius: 6px;
+  border-left: 3px solid #f0883e;
+}
+
+.failure-mode .mode-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: #f0883e;
+  margin-bottom: 4px;
+}
+
+.failure-mode .mode-count {
+  font-size: 12px;
+  color: #8b949e;
+}
+
+.failure-mode .mode-notes {
+  font-size: 11px;
+  color: #8b949e;
+  margin-top: 4px;
+}
+
+.failure-mode .mode-notes span {
+  cursor: pointer;
+  color: #58a6ff;
+  margin-right: 6px;
+}
+
+.failure-mode .mode-notes span:hover { text-decoration: underline; }
+
+/* Coverage stats */
+.coverage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.coverage-card {
+  background: #0d1117;
+  border-radius: 6px;
+  padding: 12px;
+  text-align: center;
+}
+
+.coverage-card .label { font-size: 11px; color: #8b949e; margin-bottom: 4px; }
+.coverage-card .value { font-size: 24px; font-weight: 700; color: #58a6ff; }
+.coverage-card .detail { font-size: 11px; color: #8b949e; margin-top: 2px; }
+
+/* Entity type summary table */
+.entity-summary {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+.entity-summary th {
+  text-align: left;
+  padding: 6px 12px;
+  border-bottom: 1px solid #30363d;
+  color: #8b949e;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.entity-summary td {
+  padding: 6px 12px;
+  border-bottom: 1px solid #21262d;
+}
+
+/* Toast notification */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: #1f6feb;
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  z-index: 300;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.3s;
+  pointer-events: none;
+}
+
+.toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+
+/* Export button */
+.export-btn {
+  padding: 6px 14px;
+  background: #238636;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.15s;
+}
+
+.export-btn:hover { background: #2ea043; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>PHI Scrubber Error Discovery</h1>
+  <div class="tabs">
+    <div class="tab active" data-view="article">Review</div>
+    <div class="tab" data-view="map">Map</div>
+    <div class="tab" data-view="progress">Progress</div>
+  </div>
+  <div class="stats">
+    <span>Notes: <span class="stat-val" id="stat-notes">0</span></span>
+    <span>Labels: <span class="stat-val" id="stat-labels">0</span></span>
+    <span>Reviewed: <span class="stat-val" id="stat-reviewed">0</span></span>
+    <span>Annotations: <span class="stat-val" id="stat-annotations">0</span></span>
+  </div>
+  <button class="export-btn" onclick="exportAnnotations()">Export</button>
+</div>
+
+<div class="note-nav" id="note-nav"></div>
+
+<div class="view active" id="view-article">
+  <div class="article-container">
+    <div class="article-body">
+      <div class="article-header">
+        <h2 id="article-title"></h2>
+        <div class="article-badges" id="article-badges"></div>
+      </div>
+      <div class="note-text" id="note-text"></div>
+    </div>
+    <div class="margin-notes" id="margin-notes"></div>
+  </div>
+</div>
+
+<div class="view" id="view-map">
+  <div class="map-container">
+    <canvas class="map-canvas" id="map-canvas"></canvas>
+    <div class="map-legend" id="map-legend"></div>
+  </div>
+</div>
+
+<div class="view" id="view-progress">
+  <div class="progress-container">
+    <div class="progress-section">
+      <h3>Coverage</h3>
+      <div class="coverage-grid" id="coverage-grid"></div>
+    </div>
+    <div class="progress-section">
+      <h3>Entity Type Summary</h3>
+      <table class="entity-summary" id="entity-summary"></table>
+    </div>
+    <div class="progress-section">
+      <h3>Failure Modes Discovered</h3>
+      <div class="failure-mode-list" id="failure-mode-list"></div>
+    </div>
+    <div class="progress-section">
+      <h3>All Annotations</h3>
+      <div class="failure-mode-list" id="all-annotations-list"></div>
+    </div>
+  </div>
+</div>
+
+<div class="annotation-popover" id="annotation-popover">
+  <input type="text" id="annotation-input" placeholder="What do you notice about this text?">
+  <div class="hint">Press Enter to save, Escape to cancel</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const ENTITY_COLORS = {
+  PERSON: { bg: 'rgba(88,166,255,0.15)', border: '#58a6ff', badge: 'badge-person' },
+  ORG: { bg: 'rgba(188,140,255,0.15)', border: '#bc8cff', badge: 'badge-org' },
+  DATE: { bg: 'rgba(240,136,62,0.15)', border: '#f0883e', badge: 'badge-date' },
+  ADDRESS: { bg: 'rgba(63,185,80,0.15)', border: '#3fb950', badge: 'badge-address' },
+  EMAIL: { bg: 'rgba(247,120,186,0.15)', border: '#f778ba', badge: 'badge-email' },
+  PHONE: { bg: 'rgba(210,168,255,0.15)', border: '#d2a8ff', badge: 'badge-phone' },
+  MEMBER_ID: { bg: 'rgba(121,192,255,0.15)', border: '#79c0ff', badge: 'badge-member-id' },
+  FAMILY_DETAIL: { bg: 'rgba(227,179,65,0.15)', border: '#e3b341', badge: 'badge-family' },
+  LOCATION: { bg: 'rgba(86,212,221,0.15)', border: '#56d4dd', badge: 'badge-location' },
+  BENEFIT_ID: { bg: 'rgba(255,123,114,0.15)', border: '#ff7b72', badge: 'badge-benefit-id' },
+  OTHER: { bg: 'rgba(139,148,158,0.15)', border: '#8b949e', badge: 'badge-other' },
+};
+
+let traces = [];
+let annotations = [];
+let currentNoteId = null;
+let graphData = null;
+
+async function fetchJSON(url) {
+  const r = await fetch(url);
+  return r.json();
+}
+
+async function postJSON(url, data) {
+  await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+async function init() {
+  traces = await fetchJSON('/api/traces');
+  annotations = await fetchJSON('/api/annotations');
+  graphData = await fetchJSON('/api/graph');
+
+  updateStats();
+  renderNoteNav();
+  if (traces.length > 0) {
+    const nonClean = traces.find(t => !t.clean);
+    selectNote(nonClean ? nonClean.id : traces[0].id);
+  }
+
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('view-' + tab.dataset.view).classList.add('active');
+      if (tab.dataset.view === 'map') renderMap();
+      if (tab.dataset.view === 'progress') renderProgress();
+    });
+  });
+
+  document.addEventListener('mouseup', handleTextSelection);
+
+  const input = document.getElementById('annotation-input');
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') saveAnnotation();
+    if (e.key === 'Escape') hidePopover();
+  });
+  document.addEventListener('click', (e) => {
+    const popover = document.getElementById('annotation-popover');
+    if (popover.style.display === 'block' && !popover.contains(e.target)) {
+      hidePopover();
+    }
+  });
+
+  setInterval(pollAnnotations, 3000);
+}
+
+function updateStats() {
+  document.getElementById('stat-notes').textContent = traces.length;
+  const totalLabels = traces.reduce((s, t) => s + t.total_labels, 0);
+  document.getElementById('stat-labels').textContent = totalLabels;
+  const reviewedNotes = new Set(annotations.map(a => a.noteId));
+  document.getElementById('stat-reviewed').textContent = reviewedNotes.size;
+  document.getElementById('stat-annotations').textContent = annotations.length;
+}
+
+function renderNoteNav() {
+  const nav = document.getElementById('note-nav');
+  nav.innerHTML = '';
+  const annotatedNotes = new Set(annotations.map(a => a.noteId));
+  traces.forEach(t => {
+    const btn = document.createElement('div');
+    btn.className = 'note-btn';
+    if (t.clean) btn.classList.add('clean');
+    if (annotatedNotes.has(t.id)) btn.classList.add('annotated');
+    if (t.id === currentNoteId) btn.classList.add('active');
+    btn.textContent = t.id + (t.clean ? ' (clean)' : '');
+    btn.addEventListener('click', () => selectNote(t.id));
+    nav.appendChild(btn);
+  });
+}
+
+function selectNote(noteId) {
+  currentNoteId = noteId;
+  renderNoteNav();
+  renderArticle();
+}
+
+function renderArticle() {
+  const trace = traces.find(t => t.id === currentNoteId);
+  if (!trace) return;
+
+  document.getElementById('article-title').textContent =
+    trace.id + (trace.clean ? ' (clean note — no PHI expected)' : '');
+
+  const badges = document.getElementById('article-badges');
+  badges.innerHTML = '';
+
+  if (trace.clean) {
+    badges.innerHTML = '<span class="badge badge-clean">CLEAN</span>';
+  } else {
+    trace.entity_types.forEach(et => {
+      const color = ENTITY_COLORS[et] || ENTITY_COLORS.OTHER;
+      const span = document.createElement('span');
+      span.className = 'badge ' + color.badge;
+      span.textContent = et;
+      badges.appendChild(span);
+    });
+    if (trace.hard_count > 0) {
+      const span = document.createElement('span');
+      span.className = 'badge badge-hard';
+      span.textContent = trace.hard_count + '/' + trace.total_labels + ' hard';
+      badges.appendChild(span);
+    }
+  }
+
+  renderHighlightedText(trace);
+  renderMarginNotes(trace);
+}
+
+function renderHighlightedText(trace) {
+  const container = document.getElementById('note-text');
+  const text = trace.original_text;
+
+  if (trace.clean || !trace.expected_redactions || trace.expected_redactions.length === 0) {
+    container.textContent = text;
+    return;
+  }
+
+  const spans = trace.expected_redactions
+    .filter(r => r.start >= 0)
+    .sort((a, b) => a.start - b.start);
+
+  let html = '';
+  let pos = 0;
+  spans.forEach(span => {
+    if (span.start > pos) {
+      html += escapeHtml(text.substring(pos, span.start));
+    }
+    const color = ENTITY_COLORS[span.entity] || ENTITY_COLORS.OTHER;
+    const cls = 'phi-span caught';
+    html += `<span class="${cls}" data-entity="${span.entity}" data-text="${escapeAttr(span.text)}" `
+      + `data-hard="${span.hard}" `
+      + `style="background:${color.bg};border-bottom-color:${color.border}" `
+      + `title="${span.entity}: ${escapeAttr(span.text)}${span.hard ? ' (HARD)' : ''}">`
+      + escapeHtml(text.substring(span.start, span.end))
+      + '</span>';
+    pos = span.end;
+  });
+  if (pos < text.length) {
+    html += escapeHtml(text.substring(pos));
+  }
+
+  const noteAnnotations = annotations.filter(a => a.noteId === currentNoteId);
+  container.innerHTML = html;
+
+  noteAnnotations.forEach(ann => {
+    if (ann.selectedText) {
+      highlightAnnotation(container, ann);
+    }
+  });
+}
+
+function highlightAnnotation(container, ann) {
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  let node;
+  let found = false;
+  while ((node = walker.nextNode()) && !found) {
+    const idx = node.textContent.indexOf(ann.selectedText);
+    if (idx >= 0) {
+      const range = document.createRange();
+      range.setStart(node, idx);
+      range.setEnd(node, idx + ann.selectedText.length);
+      const highlight = document.createElement('span');
+      highlight.className = 'phi-span pending-highlight';
+      highlight.dataset.annotationId = ann.id;
+      highlight.title = ann.note;
+      range.surroundContents(highlight);
+      found = true;
+    }
+  }
+}
+
+function renderMarginNotes(trace) {
+  const container = document.getElementById('margin-notes');
+  container.innerHTML = '';
+
+  if (!trace.clean && trace.expected_redactions) {
+    trace.expected_redactions.forEach(r => {
+      const note = document.createElement('div');
+      const status = 'caught';
+      note.className = 'margin-note ' + status;
+
+      const color = ENTITY_COLORS[r.entity] || ENTITY_COLORS.OTHER;
+      note.innerHTML = `
+        <div class="entity-label" style="color:${color.border}">${r.entity}${r.hard ? ' (HARD)' : ''}</div>
+        <div class="entity-text">"${escapeHtml(r.text)}"</div>
+        <div class="entity-status">Status: caught by golden run</div>
+      `;
+
+      note.addEventListener('mouseenter', () => {
+        document.querySelectorAll(`.phi-span[data-text="${CSS.escape(r.text)}"]`).forEach(el => {
+          el.style.outline = '2px solid ' + color.border;
+        });
+      });
+      note.addEventListener('mouseleave', () => {
+        document.querySelectorAll('.phi-span').forEach(el => {
+          el.style.outline = '';
+        });
+      });
+
+      container.appendChild(note);
+    });
+  }
+
+  const noteAnnotations = annotations.filter(a => a.noteId === currentNoteId);
+  noteAnnotations.forEach(ann => {
+    const note = document.createElement('div');
+    note.className = 'margin-note human-annotation';
+    note.innerHTML = `
+      <button class="delete-btn" title="Delete annotation">&times;</button>
+      <div class="entity-label" style="color:#58a6ff">YOUR ANNOTATION</div>
+      <div class="entity-text">"${escapeHtml(ann.selectedText || '(general)')}"</div>
+      <div class="annotation-text">${escapeHtml(ann.note)}</div>
+    `;
+    note.querySelector('.delete-btn').addEventListener('click', () => {
+      deleteAnnotation(ann.id);
+    });
+    container.appendChild(note);
+  });
+}
+
+let pendingSelection = null;
+
+function handleTextSelection(e) {
+  const popover = document.getElementById('annotation-popover');
+  if (popover.contains(e.target)) return;
+
+  const selection = window.getSelection();
+  if (!selection || selection.isCollapsed) return;
+
+  const noteText = document.getElementById('note-text');
+  if (!noteText.contains(selection.anchorNode)) return;
+
+  const selectedText = selection.toString().trim();
+  if (!selectedText) return;
+
+  const range = selection.getRangeAt(0);
+  const highlight = document.createElement('span');
+  highlight.className = 'phi-span pending-highlight';
+  range.surroundContents(highlight);
+
+  pendingSelection = { text: selectedText, highlightEl: highlight };
+
+  const rect = highlight.getBoundingClientRect();
+  popover.style.left = rect.left + 'px';
+  popover.style.top = (rect.bottom + 8) + 'px';
+  popover.style.display = 'block';
+
+  selection.removeAllRanges();
+
+  const input = document.getElementById('annotation-input');
+  input.value = '';
+  input.focus();
+}
+
+function hidePopover() {
+  const popover = document.getElementById('annotation-popover');
+  popover.style.display = 'none';
+  if (pendingSelection && pendingSelection.highlightEl) {
+    const el = pendingSelection.highlightEl;
+    if (el.parentNode) {
+      el.replaceWith(...el.childNodes);
+    }
+  }
+  pendingSelection = null;
+}
+
+async function saveAnnotation() {
+  const input = document.getElementById('annotation-input');
+  const note = input.value.trim();
+  if (!note || !pendingSelection) return;
+
+  const ann = {
+    id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+    noteId: currentNoteId,
+    selectedText: pendingSelection.text,
+    note: note,
+    timestamp: new Date().toISOString(),
+  };
+
+  annotations.push(ann);
+  await postJSON('/api/annotations', annotations);
+
+  const popover = document.getElementById('annotation-popover');
+  popover.style.display = 'none';
+
+  if (pendingSelection.highlightEl) {
+    pendingSelection.highlightEl.dataset.annotationId = ann.id;
+    pendingSelection.highlightEl.title = note;
+  }
+
+  pendingSelection = null;
+  updateStats();
+  renderNoteNav();
+  renderMarginNotes(traces.find(t => t.id === currentNoteId));
+  showToast('Annotation saved');
+}
+
+async function deleteAnnotation(annId) {
+  annotations = annotations.filter(a => a.id !== annId);
+  await postJSON('/api/annotations', annotations);
+  updateStats();
+  renderNoteNav();
+  renderArticle();
+  showToast('Annotation deleted');
+}
+
+async function pollAnnotations() {
+  try {
+    const fresh = await fetchJSON('/api/annotations');
+    if (JSON.stringify(fresh) !== JSON.stringify(annotations)) {
+      annotations = fresh;
+      updateStats();
+      renderNoteNav();
+    }
+  } catch(e) {}
+}
+
+function renderMap() {
+  const canvas = document.getElementById('map-canvas');
+  const ctx = canvas.getContext('2d');
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * devicePixelRatio;
+  canvas.height = rect.height * devicePixelRatio;
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+  const W = rect.width, H = rect.height;
+
+  ctx.fillStyle = '#161b22';
+  ctx.fillRect(0, 0, W, H);
+
+  if (!graphData || !graphData.nodes || graphData.nodes.length === 0) {
+    ctx.fillStyle = '#8b949e';
+    ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('No graph data', W/2, H/2);
+    return;
+  }
+
+  const nodes = graphData.nodes;
+  const xs = nodes.map(n => n.x);
+  const ys = nodes.map(n => n.y);
+  const xMin = Math.min(...xs), xMax = Math.max(...xs);
+  const yMin = Math.min(...ys), yMax = Math.max(...ys);
+  const xRange = (xMax - xMin) || 1;
+  const yRange = (yMax - yMin) || 1;
+
+  const pad = 60;
+  const annotatedNotes = new Set(annotations.map(a => a.noteId));
+
+  const entityColors = ['#58a6ff','#bc8cff','#f0883e','#3fb950','#f778ba','#d2a8ff','#79c0ff','#e3b341','#56d4dd','#ff7b72'];
+
+  nodes.forEach(node => {
+    const x = pad + ((node.x - xMin) / xRange) * (W - 2*pad);
+    const y = pad + ((node.y - yMin) / yRange) * (H - 2*pad);
+    const r = node.clean ? 6 : 8 + node.total_labels;
+
+    const mainType = node.entity_types[0] || 'OTHER';
+    const typeIdx = graphData.entity_types.indexOf(mainType);
+    const color = entityColors[typeIdx % entityColors.length] || '#8b949e';
+
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = node.clean ? '#21262d' : color + '33';
+    ctx.fill();
+    ctx.strokeStyle = annotatedNotes.has(node.id) ? '#f0883e' : (node.id === currentNoteId ? '#fff' : color);
+    ctx.lineWidth = annotatedNotes.has(node.id) ? 3 : (node.id === currentNoteId ? 2 : 1);
+    ctx.stroke();
+
+    ctx.fillStyle = '#c9d1d9';
+    ctx.font = '11px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(node.id.replace('note-',''), x, y + r + 14);
+  });
+
+  canvas.onclick = function(e) {
+    const canvasRect = canvas.getBoundingClientRect();
+    const mx = e.clientX - canvasRect.left;
+    const my = e.clientY - canvasRect.top;
+    let closest = null, closestDist = Infinity;
+    nodes.forEach(node => {
+      const x = pad + ((node.x - xMin) / xRange) * (W - 2*pad);
+      const y = pad + ((node.y - yMin) / yRange) * (H - 2*pad);
+      const d = Math.sqrt((mx-x)**2 + (my-y)**2);
+      if (d < closestDist && d < 30) { closestDist = d; closest = node; }
+    });
+    if (closest) {
+      selectNote(closest.id);
+      document.querySelector('.tab[data-view="article"]').click();
+    }
+  };
+
+  const legend = document.getElementById('map-legend');
+  legend.innerHTML = '';
+  graphData.entity_types.forEach((et, i) => {
+    const item = document.createElement('span');
+    item.className = 'map-legend-item';
+    item.innerHTML = `<span class="map-legend-dot" style="background:${entityColors[i % entityColors.length]}"></span> ${et}`;
+    legend.appendChild(item);
+  });
+}
+
+function renderProgress() {
+  const annotatedNotes = new Set(annotations.map(a => a.noteId));
+  const nonClean = traces.filter(t => !t.clean);
+  const allEntityTypes = new Set();
+  traces.forEach(t => t.entity_types.forEach(et => allEntityTypes.add(et)));
+
+  const entityCounts = {};
+  traces.forEach(t => {
+    (t.expected_redactions || []).forEach(r => {
+      if (!entityCounts[r.entity]) entityCounts[r.entity] = { total: 0, hard: 0, notes: new Set() };
+      entityCounts[r.entity].total++;
+      if (r.hard) entityCounts[r.entity].hard++;
+      entityCounts[r.entity].notes.add(t.id);
+    });
+  });
+
+  const grid = document.getElementById('coverage-grid');
+  grid.innerHTML = `
+    <div class="coverage-card">
+      <div class="label">Notes Reviewed</div>
+      <div class="value">${annotatedNotes.size}/${nonClean.length}</div>
+      <div class="detail">${Math.round(annotatedNotes.size/nonClean.length*100)}% coverage</div>
+    </div>
+    <div class="coverage-card">
+      <div class="label">Total Annotations</div>
+      <div class="value">${annotations.length}</div>
+      <div class="detail">across ${annotatedNotes.size} notes</div>
+    </div>
+    <div class="coverage-card">
+      <div class="label">Entity Types</div>
+      <div class="value">${allEntityTypes.size}</div>
+      <div class="detail">${[...allEntityTypes].join(', ')}</div>
+    </div>
+    <div class="coverage-card">
+      <div class="label">Expected Labels</div>
+      <div class="value">71</div>
+      <div class="detail">55 hard, 16 easy</div>
+    </div>
+  `;
+
+  const table = document.getElementById('entity-summary');
+  let tableHtml = `<thead><tr><th>Entity Type</th><th>Count</th><th>Hard</th><th>Notes</th></tr></thead><tbody>`;
+  Object.entries(entityCounts).sort((a,b) => b[1].total - a[1].total).forEach(([et, data]) => {
+    tableHtml += `<tr><td><span class="badge ${(ENTITY_COLORS[et]||ENTITY_COLORS.OTHER).badge}">${et}</span></td>`
+      + `<td>${data.total}</td><td>${data.hard}</td><td>${data.notes.size}</td></tr>`;
+  });
+  tableHtml += '</tbody>';
+  table.innerHTML = tableHtml;
+
+  const modesByNote = {};
+  annotations.forEach(ann => {
+    if (!modesByNote[ann.noteId]) modesByNote[ann.noteId] = [];
+    modesByNote[ann.noteId].push(ann);
+  });
+
+  const modeList = document.getElementById('failure-mode-list');
+  if (annotations.length === 0) {
+    modeList.innerHTML = '<div style="color:#8b949e;font-size:13px;padding:8px;">No annotations yet. Select text in a note and add your observations.</div>';
+  } else {
+    const byCategory = {};
+    annotations.forEach(ann => {
+      const key = ann.note.toLowerCase().substring(0, 40);
+      if (!byCategory[key]) byCategory[key] = { note: ann.note, items: [] };
+      byCategory[key].items.push(ann);
+    });
+    modeList.innerHTML = '';
+    Object.values(byCategory).forEach(cat => {
+      const div = document.createElement('div');
+      div.className = 'failure-mode';
+      div.innerHTML = `
+        <div class="mode-name">${escapeHtml(cat.note)}</div>
+        <div class="mode-count">${cat.items.length} instance(s)</div>
+        <div class="mode-notes">${cat.items.map(i =>
+          `<span onclick="selectNote('${i.noteId}');document.querySelector('.tab[data-view=article]').click()">${i.noteId}</span>`
+        ).join('')}</div>
+      `;
+      modeList.appendChild(div);
+    });
+  }
+
+  const allList = document.getElementById('all-annotations-list');
+  allList.innerHTML = '';
+  annotations.forEach(ann => {
+    const div = document.createElement('div');
+    div.className = 'failure-mode';
+    div.innerHTML = `
+      <div class="mode-name" style="color:#58a6ff">${escapeHtml(ann.noteId)}: "${escapeHtml(ann.selectedText || '(general)')}"</div>
+      <div class="mode-count">${escapeHtml(ann.note)}</div>
+      <div class="mode-notes" style="color:#6e7681">${ann.timestamp}</div>
+    `;
+    allList.appendChild(div);
+  });
+}
+
+function exportAnnotations() {
+  const data = {
+    exported_at: new Date().toISOString(),
+    total_annotations: annotations.length,
+    notes_reviewed: [...new Set(annotations.map(a => a.noteId))],
+    annotations: annotations,
+    traces_summary: traces.map(t => ({
+      id: t.id,
+      clean: t.clean,
+      entity_types: t.entity_types,
+      total_labels: t.total_labels,
+      hard_count: t.hard_count,
+    })),
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `phi-scrubber-error-discovery-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Exported!');
+}
+
+function escapeHtml(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function escapeAttr(s) {
+  return (s || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+init();
+</script>
+</body>
+</html>

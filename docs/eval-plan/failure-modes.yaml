@@ -1,0 +1,191 @@
+metadata:
+  generated: '2026-06-27'
+  source: error-discovery analysis of 21 golden coaching notes
+  methodology: Systematic note-by-note review + heuristic pattern matching + manual clinical analysis
+  total_notes: 21
+  clean_notes: 3
+  total_expected_labels: 71
+  hard_labels: 55
+failure_modes:
+  first_name_only:
+    description: Single first name without surname — common names (Marcus, Kit, Cal, Devon) may be treated as regular words
+      by the model. The model must learn that in a coaching note context, a capitalized word following a possessive or used
+      as a subject is likely a person's name.
+    severity: critical
+    category: false_negative_risk
+    prevalence:
+      instance_count: 23
+      note_count: 17
+      notes:
+      - note-01
+      - note-02
+      - note-03
+      - note-04
+      - note-05
+      - note-06
+      - note-07
+      - note-08
+      - note-09
+      - note-11
+      - note-12
+      - note-13
+      - note-14
+      - note-15
+      - note-16
+      - note-17
+      - note-18
+    examples:
+    - Marcus (note-01)
+    - Devon (note-02)
+    - Priya (note-03)
+    - Jamal (note-04)
+    - Theo (note-04)
+    - Lena (note-04)
+    - Eleanor (note-05)
+    - Gerald (note-05)
+    - Aisha (note-06)
+    - Tomas (note-07)
+  compound_identifier:
+    description: Relationship + institution + timing combined into one identifying phrase (e.g., "his daughter who just started
+      at Northwestern", "Her wife, who returned to work as a trauma surgeon at Gulfport General"). The model must catch the
+      FULL compound, not just the name within it. Partial detection leaves re-identification possible.
+    severity: critical
+    category: detection_completeness
+    prevalence:
+      instance_count: 5
+      note_count: 5
+      notes:
+      - note-02
+      - note-04
+      - note-07
+      - note-12
+      - note-17
+    examples:
+    - his daughter who just started at Northwestern (note-02)
+    - his sister Lena, who lives in Tacoma (note-04)
+    - his son Mateo started kindergarten this fall (note-07)
+    - Her mother, who recently moved into the memory-care wing at Lakeshore Manor (note-12)
+    - Her wife, who returned to work as a trauma surgeon at Gulfport General (note-17)
+  possessive_relationship_without_name:
+    description: Possessive pronoun + family role without an explicit name ("his mom", "her in-laws", "the kids", "his sister",
+      "her mother", "aging parents"). These are identifying to different degrees — "his mom" is very low risk, but "her mother
+      who recently moved into the memory-care wing at Lakeshore Manor" is high risk because the institution narrows the search.
+      The expected labels handle some of these via FAMILY_DETAIL but not consistently.
+    severity: high
+    category: contextual_identifier
+    prevalence:
+      instance_count: 10
+      note_count: 8
+      notes:
+      - note-01
+      - note-03
+      - note-04
+      - note-07
+      - note-08
+      - note-12
+      - note-16
+      - note-17
+    examples:
+    - '"his mom" (note-01) — low risk, no context to narrow'
+    - '"her in-laws" (note-03) — medium risk with address on same note'
+    - '"the kids" (note-08) — low risk alone, higher with "divorce" context'
+    - '"her mother, who recently moved into the memory-care wing at Lakeshore Manor" (note-12) — HIGH, labeled as FAMILY_DETAIL'
+    - '"aging parents" (note-16) — medium risk with Asheville destination'
+    - '"the baby" (note-17) — low risk alone, but "postpartum" + "wife is trauma surgeon" narrows'
+  email_in_username_leaks_name:
+    description: 'Email addresses that contain the person''s real name in the username part: devon.k.harper@fastmail.com (leaks
+      "Devon Harper"), carlos.mendez88@zoho.com (leaks "Carlos Mendez"), kit.delgado@gmail.com (leaks "Kit Delgado"), e.whitfield@protonmail.com
+      (leaks "E. Whitfield"). Even if the scrubber catches the email as a unit, the name WITHIN the email must also be independently
+      caught as a PERSON. If the email is caught but the name parsing fails, the name still appears elsewhere in the note.'
+    severity: high
+    category: detection_completeness
+    prevalence:
+      instance_count: 4
+      note_count: 4
+      notes:
+      - note-02
+      - note-05
+      - note-09
+      - note-13
+    examples:
+    - devon.k.harper@fastmail.com → "Devon Harper" (note-02)
+    - e.whitfield@protonmail.com → "E. Whitfield" (note-05)
+    - kit.delgado@gmail.com → "Kit Delgado" (note-09)
+    - carlos.mendez88@zoho.com → "Carlos Mendez" (note-13)
+  clinical_detail_as_quasi_identifier:
+    description: 'Clinical details that are not PHI per se but become quasi-identifiers in combination: "custody hearing"
+      (note-13), "divorce" (note-08), "postpartum" (note-17), "panic episodes before shifts" (note-02). Under MHMDA/42 CFR
+      Part 2, the fact that someone is receiving mental health treatment is itself protected. These are not in scope for the
+      current scrubber (which focuses on direct identifiers), but a clinical expert should flag which combinations cross the
+      re-identification threshold.'
+    severity: medium
+    category: scope_boundary
+    prevalence:
+      instance_count: 8
+      note_count: 7
+      notes:
+      - note-02
+      - note-04
+      - note-08
+      - note-09
+      - note-13
+      - note-15
+      - note-17
+    examples:
+    - '"custody hearing" (note-13) — legal proceeding is identifying in small communities'
+    - '"divorce" + "pottery class on Hawthorne Street" (note-08) — combination narrows'
+    - '"postpartum" + "wife is trauma surgeon at Gulfport General" (note-17) — high combination risk'
+    - '"imposter feelings back to her childhood in Cleveland" (note-09) — biographical detail'
+  location_as_address_vs_region:
+    description: 'The expected labels use both ADDRESS (specific street: "Maple Crest Avenue", "Hawthorne Street", "Juniper
+      Bend Road", "corner of 4th and Birch in Glenndale") and LOCATION (city/region: "Cleveland", "Tacoma", "Asheville").
+      The distinction matters for severity — a street address is much more identifying than a city name. The model must learn
+      this distinction, and the over-redaction risk is higher for common city names.'
+    severity: medium
+    category: entity_granularity
+    prevalence:
+      instance_count: 7
+      note_count: 7
+      notes:
+      - note-03
+      - note-04
+      - note-07
+      - note-08
+      - note-09
+      - note-15
+      - note-16
+    examples:
+    - 'ADDRESS: "Maple Crest Avenue" (note-03) — street-level, high risk'
+    - 'ADDRESS: "corner of 4th and Birch in Glenndale" (note-07) — intersection + city, very high'
+    - 'LOCATION: "Cleveland" (note-09) — city, medium risk'
+    - 'LOCATION: "Tacoma" (note-04) — city in FAMILY_DETAIL context, higher risk'
+  over_redaction_common_temporal:
+    description: Common temporal phrases ("today", "last week", "this morning", "next week") that should NOT be redacted because
+      they carry minimal identifying power. Over-redacting these reduces clinical utility of the scrubbed record. The model
+      must learn the difference between "this past Thanksgiving" (identifying — anchors to a specific week) and "today" (not
+      identifying — every note has a "today").
+    severity: low
+    category: over_redaction
+    prevalence:
+      instance_count: 14
+      note_count: 12
+      notes:
+      - note-01
+      - note-02
+      - note-03
+      - note-04
+      - note-05
+      - note-06
+      - note-07
+      - note-08
+      - note-09
+      - note-11
+      - note-17
+      - note-18
+    examples:
+    - today (note-01, 02, 06, 08, 09)
+    - last week (note-01, 17)
+    - this fall (note-07)
+    - next week (note-05)
+    - this week (note-12, 14, 16)
+    - each morning (note-04)
